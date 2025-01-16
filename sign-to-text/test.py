@@ -15,7 +15,7 @@ imgSize = 300
 folder = "Data/C"
 counter = 0
 
-labels=["A", "B", "C","D"]
+labels=["A", "B", "C","D","E","F","G","H"]
 
 while True:
     success, img=cap.read()
@@ -65,8 +65,8 @@ while True:
             
             
         
-        #cv2.imshow("Image Cropped", imgCrop)
-        #cv2.imshow("Image White", imgWhite)
+        cv2.imshow("Image Cropped", imgCrop)
+        cv2.imshow("Image White", imgWhite)
         
         
         
