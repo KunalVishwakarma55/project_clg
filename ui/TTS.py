@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                               QButtonGroup, QTextEdit, QGraphicsDropShadowEffect)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QPixmap, QColor
-from PySide6.QtMultimedia import QMediaPlayer
+from PySide6.QtMultimedia import QMediaPlayer,QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 import subprocess
 
@@ -132,7 +132,13 @@ class TTS(QMainWindow):
         super().__init__()
         
         
+        self.audio_output = QAudioOutput()
         self.media_player = QMediaPlayer()
+        self.media_player.setAudioOutput(self.audio_output)
+        self.audio_output.setVolume(0.5)  # 0.5 = 50% volume
+
+
+
         
         # Initialize dataset
         self.dataset_path = "C:/Users/Ravi/Desktop/College_project/text-to-sign/Dataset"
@@ -354,6 +360,66 @@ class TTS(QMainWindow):
         """)
         self.media_player.setVideoOutput(self.video_widget)
 
+        # Add after the video_widget in create_main_content method
+        # Create video controls layout
+        video_controls = QHBoxLayout()
+        video_controls.setSpacing(10)
+
+        # Create control buttons with icons
+        self.play_pause_btn = QPushButton("Play")
+        self.mute_btn = QPushButton("Unmute")
+
+        # Style for control buttons
+        # In create_main_content method, update the control button style:
+        control_btn_style = """
+            QPushButton {
+                background-color: #2962ff;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 600;
+                font-family: 'Segoe UI';
+                min-width: 80px;
+                min-height: 35px;
+            }
+            QPushButton:hover {
+                background-color: #1e88e5;
+                margin-top: -1px;
+            }
+            QPushButton:pressed {
+                background-color: #1565c0;
+                margin-top: 0px;
+            }
+        """
+
+        # Create video controls with different colors
+        self.play_pause_btn = QPushButton("Play")
+        self.mute_btn = QPushButton("Unmute")
+
+        # Set unique colors for each button
+        self.play_pause_btn.setStyleSheet(control_btn_style.replace("#2962ff", "#00c853"))  # Green for play/pause
+        self.mute_btn.setStyleSheet(control_btn_style.replace("#2962ff", "#ff1744"))        # Red for mute/unmute
+
+        # Add hover effects
+        video_controls.setSpacing(15)
+        self.play_pause_btn.setCursor(Qt.PointingHandCursor)
+        self.mute_btn.setCursor(Qt.PointingHandCursor)
+
+
+        # Add buttons to controls layout
+        video_controls.addWidget(self.play_pause_btn)
+        video_controls.addWidget(self.mute_btn)
+        video_controls.addStretch()
+
+        # Connect button signals
+        self.play_pause_btn.clicked.connect(self.toggle_play_pause)
+        self.mute_btn.clicked.connect(self.toggle_mute)
+
+        # Add video controls to right layout
+        right_layout.addLayout(video_controls)
+
+
         # Create and style buttons
         buttons = [
             ("Send", "#2962ff"),
@@ -390,6 +456,22 @@ class TTS(QMainWindow):
 
         self.main_layout.addWidget(main_widget)
 
+    def toggle_play_pause(self):
+        if self.media_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+            self.media_player.pause()
+            self.play_pause_btn.setText("Play")
+        else:
+            self.media_player.play()
+            self.play_pause_btn.setText("Pause")
+
+    def toggle_mute(self):
+        if self.audio_output.isMuted():
+            self.audio_output.setMuted(False)
+            self.mute_btn.setText("Mute")
+        else:
+            self.audio_output.setMuted(True)
+            self.mute_btn.setText("Unmute")
+
 
 
     def send_text(self):
@@ -403,6 +485,9 @@ class TTS(QMainWindow):
         if output_path and os.path.exists(output_path):
             self.media_player.setSource(output_path)
             self.media_player.play()
+            self.play_pause_btn.setText("Pause")
+            self.mute_btn.setText("Mute")
+
 
 
 
