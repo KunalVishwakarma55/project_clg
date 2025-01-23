@@ -10,251 +10,221 @@ from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxL
 from cvzone.HandTrackingModule import HandDetector
 from cvzone.ClassificationModule import Classifier
 
-# Initialize Text-to-Speech Engine
-engine = pyttsx3.init()
+# Sign Detection Logic
+class SignDetector:
+    def __init__(self, model_path, labels_path, img_size=300, offset=20):
+        self.detector = HandDetector(maxHands=1)
+        self.classifier = Classifier(model_path, labels_path)
+        self.img_size = img_size
+        self.offset = offset
+        self.labels = ["A", "B", "C", "D", "E", "F", "G", "H"]
 
-# Initialize the camera, hand detector, and classifier
-cap = cv2.VideoCapture(0)
-detector = HandDetector(maxHands=1)
-classifier = Classifier("Model/keras_model.h5", "Model/labels.txt")
-
-# Initialize Translator
-translator = Translator()
-
-# Parameters
-offset = 20
-imgSize = 300
-labels = ["A", "B", "C", "D","E","F","G","H"]
-sentence = ""  # To store the concatenated sentence
-current_sign = ""  # To store the detected character
-detecting = False  # Flag to indicate if detection is running
-
-# Function to detect sign language
-def detect_sign():
-    global current_sign, img_frame
-    if not detecting:  # Stop detection if the flag is False
-        return
-    success, img = cap.read()
-    if not success:
-        return
-
-    imgOutput = img.copy()
-    hands, img = detector.findHands(img)
-
-    if hands:
-        hand = hands[0]
-        x, y, w, h = hand['bbox']
-        imgWhite = np.ones((imgSize, imgSize, 3), np.uint8) * 255
-
-        imgCrop = img[y - offset:y + h + offset, x - offset:x + w + offset]
-        aspectRatio = h / w
-
-        try:
-            if aspectRatio > 1:
-                k = imgSize / h
-                wCal = math.ceil(k * w)
-                imgResize = cv2.resize(imgCrop, (wCal, imgSize))
-                wGap = math.ceil((imgSize - wCal) / 2)
-                imgWhite[:, wGap:wCal + wGap] = imgResize
-            else:
-                k = imgSize / w
-                hCal = math.ceil(k * h)
-                imgResize = cv2.resize(imgCrop, (imgSize, hCal))
-                hGap = math.ceil((imgSize - hCal) / 2)
-                imgWhite[hGap:hCal + hGap, :] = imgResize
-
-            prediction, index = classifier.getPrediction(imgWhite, draw=False)
-            current_sign = labels[index]
-        except:
-            current_sign = ""
-    else:
+    def detect(self, img):
+        hands, img = self.detector.findHands(img)
         current_sign = ""
 
-    # Convert the OpenCV frame (BGR) to a format compatible with PySide6
-    img_frame = cv2.cvtColor(imgOutput, cv2.COLOR_BGR2RGB)
-    h, w, c = img_frame.shape
-    bytes_per_line = c * w
-    q_image = QImage(img_frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
-    pixmap = QPixmap.fromImage(q_image)
+        if hands:
+            hand = hands[0]
+            x, y, w, h = hand['bbox']
+            img_white = np.ones((self.img_size, self.img_size, 3), np.uint8) * 255
 
-    # Update the video feed
-    video_label.setPixmap(pixmap)
+            img_crop = img[y - self.offset:y + h + self.offset, x - self.offset:x + w + self.offset]
+            aspect_ratio = h / w
 
-    # Update the detected sign
-    detected_sign_label.setText(f"Character: {current_sign}")
+            try:
+                if aspect_ratio > 1:
+                    k = self.img_size / h
+                    w_cal = math.ceil(k * w)
+                    img_resize = cv2.resize(img_crop, (w_cal, self.img_size))
+                    w_gap = math.ceil((self.img_size - w_cal) / 2)
+                    img_white[:, w_gap:w_cal + w_gap] = img_resize
+                else:
+                    k = self.img_size / w
+                    h_cal = math.ceil(k * h)
+                    img_resize = cv2.resize(img_crop, (self.img_size, h_cal))
+                    h_gap = math.ceil((self.img_size - h_cal) / 2)
+                    img_white[h_gap:h_cal + h_gap, :] = img_resize
 
-# Function to save the current sign to the sentence
-def save_sign():
-    global sentence, current_sign
-    if current_sign:  # Save only if there's a detected sign
-        sentence += current_sign
-        sentence_label.setText(f"Sentence: {sentence}")
+                prediction, index = self.classifier.getPrediction(img_white, draw=False)
+                current_sign = self.labels[index]
+            except:
+                pass
 
-# Function to add a space to the sentence
-def add_space():
-    global sentence
-    sentence += " "  # Add a space to the sentence
-    sentence_label.setText(f"Sentence: {sentence}")
+        return current_sign, img
 
-# Function to remove the last character from the sentence
-def remove_last():
-    global sentence
-    sentence = sentence[:-1]  # Remove the last character
-    sentence_label.setText(f"Sentence: {sentence}")
+# PySide6 UI
+class SignLanguageApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Sign Language To Text Conversion")
+        self.setGeometry(0, 0, 1920, 1080)
 
-# Function to clear the sentence
-def clear_sentence():
-    global sentence
-    sentence = ""
-    sentence_label.setText("Sentence: ")
+        # Initialize components
+        self.engine = pyttsx3.init()
+        self.translator = Translator()
+        self.cap = cv2.VideoCapture(0)
+        self.detector = SignDetector("Model/keras_model.h5", "Model/labels.txt")
 
-# Function to speak the sentence
-def speak_sentence():
-    if sentence:
-        engine.say(sentence)
-        engine.runAndWait()
+        self.sentence = ""
+        self.current_sign = ""
+        self.detecting = False
 
-# Function to translate the sentence based on selected language
-def translate():
-    global sentence
-    selected_language = language_combobox.currentText()
-    if sentence:
-        if selected_language == "Hindi":
-            translated = translator.translate(sentence, src='en', dest='hi')
-            translated_sentence_label.setText(f"Translated Sentence (Hindi): {translated.text}")
-        elif selected_language == "Marathi":
-            translated = translator.translate(sentence, src='en', dest='mr')
-            translated_sentence_label.setText(f"Translated Sentence (Marathi): {translated.text}")
-        else:
-            translated_sentence_label.setText("Please select a language")
+        # Layouts
+        self.main_layout = QVBoxLayout()
+        self.video_layout = QVBoxLayout()
+        self.controls_layout = QHBoxLayout()
+        self.translate_layout = QVBoxLayout()
 
-# Function to start sign detection
-def start_detection():
-    global detecting
-    detecting = True
-    start_button.setDisabled(True)
-    stop_button.setEnabled(True)
+        self.init_ui()
 
-# Function to stop sign detection
-def stop_detection():
-    global detecting
-    detecting = False
-    start_button.setEnabled(True)
-    stop_button.setDisabled(True)
+        # Timer for video feed
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_video_feed)
+        self.timer.start(10)
 
-# PySide6 GUI Setup
-app = QApplication(sys.argv)
-window = QWidget()
-window.setWindowTitle("Sign Language To Text Conversion")
+    def init_ui(self):
+        # Video Feed
+        self.video_label = QLabel()
+        self.video_label.setFixedSize(640, 480)
+        self.video_label.setStyleSheet("border: 5px solid #2980b9; background-color: rgba(0, 0, 0, 0.6);")
+        self.video_layout.addWidget(self.video_label)
 
-# Set window size to fullscreen
-window.setGeometry(0, 0, 1920, 1080)
+        # Detected Character
+        self.detected_sign_label = QLabel("Character: ")
+        self.detected_sign_label.setFont(QFont("Arial", 18, QFont.Bold))
+        self.detected_sign_label.setStyleSheet("color: #ecf0f1; background-color: rgba(44, 62, 80, 0.7); padding: 10px;")
+        self.main_layout.addWidget(self.detected_sign_label)
 
-# Layouts
-main_layout = QVBoxLayout()
-video_layout = QVBoxLayout()
-controls_layout = QHBoxLayout()
-translate_layout = QVBoxLayout()
+        # Sentence Label
+        self.sentence_label = QLabel("Sentence: ")
+        self.sentence_label.setFont(QFont("Arial", 18))
+        self.sentence_label.setStyleSheet("color: #ecf0f1; background-color: rgba(44, 62, 80, 0.7); padding: 10px;")
+        self.main_layout.addWidget(self.sentence_label)
 
-# Background Image (Full screen)
-background = QPixmap("background.jpg")
-background_label = QLabel(window)
-background_label.setPixmap(background)
-background_label.setScaledContents(True)
-background_label.setGeometry(0, 0, window.width(), window.height())  # Make the background cover the full window
+        # Language Dropdown
+        self.language_combobox = QComboBox()
+        self.language_combobox.addItem("Select Language")
+        self.language_combobox.addItem("Hindi")
+        self.language_combobox.addItem("Marathi")
+        self.language_combobox.setStyleSheet("font: 14px Arial; background-color: rgba(44, 62, 80, 0.7); color: #ecf0f1;")
+        self.translate_layout.addWidget(self.language_combobox)
 
-# Video Feed
-video_label = QLabel()
-video_label.setFixedSize(640, 480)
-video_label.setStyleSheet("border: 5px solid #2980b9; background-color: rgba(0, 0, 0, 0.6);")
-video_layout.addWidget(video_label)
+        # Translated Sentence
+        self.translated_sentence_label = QLabel("Translated Sentence: ")
+        self.translated_sentence_label.setFont(QFont("Arial", 18))
+        self.translated_sentence_label.setStyleSheet("color: #ecf0f1; background-color: rgba(44, 62, 80, 0.7); padding: 10px;")
+        self.translate_layout.addWidget(self.translated_sentence_label)
 
-# Detected Character
-detected_sign_label = QLabel("Character: ")
-detected_sign_label.setFont(QFont("Arial", 18, QFont.Bold))
-detected_sign_label.setStyleSheet("color: #ecf0f1; background-color: rgba(44, 62, 80, 0.7); padding: 10px;")
-main_layout.addWidget(detected_sign_label)
+        # Buttons
+        button_style = "font: 14px Arial; background-color: #2980b9; color: white; padding: 10px; border-radius: 5px;"
 
-# Detected Sentence
-sentence_label = QLabel("Sentence: ")
-sentence_label.setFont(QFont("Arial", 18))
-sentence_label.setStyleSheet("color: #ecf0f1; background-color: rgba(44, 62, 80, 0.7); padding: 10px;")
-main_layout.addWidget(sentence_label)
+        save_button = QPushButton("Save Sign")
+        save_button.setStyleSheet(button_style)
+        save_button.clicked.connect(self.save_sign)
+        self.controls_layout.addWidget(save_button)
 
-# Language Dropdown
-language_combobox = QComboBox()
-language_combobox.addItem("Select Language")
-language_combobox.addItem("Hindi")
-language_combobox.addItem("Marathi")
-language_combobox.setStyleSheet("font: 14px Arial; background-color: rgba(44, 62, 80, 0.7); color: #ecf0f1;")
-translate_layout.addWidget(language_combobox)
+        space_button = QPushButton("Space")
+        space_button.setStyleSheet(button_style)
+        space_button.clicked.connect(self.add_space)
+        self.controls_layout.addWidget(space_button)
 
-# Translated Sentence
-translated_sentence_label = QLabel("Translated Sentence: ")
-translated_sentence_label.setFont(QFont("Arial", 18))
-translated_sentence_label.setStyleSheet("color: #ecf0f1; background-color: rgba(44, 62, 80, 0.7); padding: 10px;")
-translate_layout.addWidget(translated_sentence_label)
+        remove_button = QPushButton("Remove Last")
+        remove_button.setStyleSheet(button_style)
+        remove_button.clicked.connect(self.remove_last)
+        self.controls_layout.addWidget(remove_button)
 
-# Buttons
-button_style = "font: 14px Arial; background-color: #2980b9; color: white; padding: 10px; border-radius: 5px;"
-save_button = QPushButton("Save Sign")
-save_button.setStyleSheet(button_style)
-save_button.clicked.connect(save_sign)
-controls_layout.addWidget(save_button)
+        clear_button = QPushButton("Clear")
+        clear_button.setStyleSheet(button_style)
+        clear_button.clicked.connect(self.clear_sentence)
+        self.controls_layout.addWidget(clear_button)
 
-space_button = QPushButton("Space")
-space_button.setStyleSheet(button_style)
-space_button.clicked.connect(add_space)
-controls_layout.addWidget(space_button)
+        speak_button = QPushButton("Speak")
+        speak_button.setStyleSheet(button_style)
+        speak_button.clicked.connect(self.speak_sentence)
+        self.controls_layout.addWidget(speak_button)
 
-remove_button = QPushButton("Remove Last")
-remove_button.setStyleSheet(button_style)
-remove_button.clicked.connect(remove_last)
-controls_layout.addWidget(remove_button)
+        translate_button = QPushButton("Translate")
+        translate_button.setStyleSheet(button_style)
+        translate_button.clicked.connect(self.translate)
+        self.controls_layout.addWidget(translate_button)
 
-clear_button = QPushButton("Clear")
-clear_button.setStyleSheet(button_style)
-clear_button.clicked.connect(clear_sentence)
-controls_layout.addWidget(clear_button)
+        start_button = QPushButton("Start")
+        start_button.setStyleSheet(button_style)
+        start_button.clicked.connect(self.start_detection)
+        self.controls_layout.addWidget(start_button)
 
-speak_button = QPushButton("Speak")
-speak_button.setStyleSheet(button_style)
-speak_button.clicked.connect(speak_sentence)
-controls_layout.addWidget(speak_button)
+        stop_button = QPushButton("Stop")
+        stop_button.setStyleSheet(button_style)
+        stop_button.clicked.connect(self.stop_detection)
+        self.controls_layout.addWidget(stop_button)
+        stop_button.setDisabled(True)
 
-translate_button = QPushButton("Translate")
-translate_button.setStyleSheet(button_style)
-translate_button.clicked.connect(translate)
-controls_layout.addWidget(translate_button)
+        # Add layouts to main layout
+        self.main_layout.addLayout(self.video_layout)
+        self.main_layout.addLayout(self.controls_layout)
+        self.main_layout.addLayout(self.translate_layout)
 
-# Start and Stop Buttons
-start_button = QPushButton("Start")
-start_button.setStyleSheet(button_style)
-start_button.clicked.connect(start_detection)
-controls_layout.addWidget(start_button)
+        # Set main layout
+        self.setLayout(self.main_layout)
 
-stop_button = QPushButton("Stop")
-stop_button.setStyleSheet(button_style)
-stop_button.clicked.connect(stop_detection)
-stop_button.setDisabled(True)  # Disable Stop button initially
-controls_layout.addWidget(stop_button)
+    def update_video_feed(self):
+        if not self.detecting:
+            return
 
-# Add all layouts to the main window
-main_layout.addLayout(video_layout)
-main_layout.addLayout(controls_layout)
-main_layout.addLayout(translate_layout)
+        success, img = self.cap.read()
+        if success:
+            self.current_sign, processed_img = self.detector.detect(img)
+            h, w, c = processed_img.shape
+            bytes_per_line = c * w
+            q_image = QImage(processed_img.data, w, h, bytes_per_line, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(q_image)
+            self.video_label.setPixmap(pixmap)
 
-# Set the layout for the window
-window.setLayout(main_layout)
+            self.detected_sign_label.setText(f"Character: {self.current_sign}")
 
-# Set a timer to continuously update the video feed
-timer = QTimer()
-timer.timeout.connect(detect_sign)
-timer.start(10)  # Update every 10 milliseconds
+    def save_sign(self):
+        if self.current_sign:
+            self.sentence += self.current_sign
+            self.sentence_label.setText(f"Sentence: {self.sentence}")
 
-# Show the window
-window.show()
+    def add_space(self):
+        self.sentence += " "
+        self.sentence_label.setText(f"Sentence: {self.sentence}")
 
-# Start the application event loop
-sys.exit(app.exec())
+    def remove_last(self):
+        self.sentence = self.sentence[:-1]
+        self.sentence_label.setText(f"Sentence: {self.sentence}")
 
+    def clear_sentence(self):
+        self.sentence = ""
+        self.sentence_label.setText("Sentence: ")
+
+    def speak_sentence(self):
+        if self.sentence:
+            self.engine.say(self.sentence)
+            self.engine.runAndWait()
+
+    def translate(self):
+        selected_language = self.language_combobox.currentText()
+        if self.sentence:
+            if selected_language == "Hindi":
+                translated = self.translator.translate(self.sentence, src='en', dest='hi')
+                self.translated_sentence_label.setText(f"Translated Sentence (Hindi): {translated.text}")
+            elif selected_language == "Marathi":
+                translated = self.translator.translate(self.sentence, src='en', dest='mr')
+                self.translated_sentence_label.setText(f"Translated Sentence (Marathi): {translated.text}")
+            else:
+                self.translated_sentence_label.setText("Please select a language")
+
+    def start_detection(self):
+        self.detecting = True
+
+    def stop_detection(self):
+        self.detecting = False
+
+# Main
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = SignLanguageApp()
+    window.show()
+    sys.exit(app.exec())
