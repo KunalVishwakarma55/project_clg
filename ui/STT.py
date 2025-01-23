@@ -284,6 +284,7 @@ class STT(QMainWindow):
         # Language selection
         self.lang_combo = QComboBox()
         self.lang_combo.addItems(["Select Language", "Hindi", "Marathi"])
+        # Replace the existing lang_combo styling with this:
         self.lang_combo.setStyleSheet("""
             QComboBox {
                 background-color: white;
@@ -292,9 +293,28 @@ class STT(QMainWindow):
                 padding: 8px;
                 min-width: 150px;
                 font-weight: 600;
-                color: #2962ff;
+                color: #1a1a1a;  /* Changed from #2962ff to #1a1a1a for better visibility */
+            }
+            QComboBox::drop-down {
+                border: none;
+                padding-right: 10px;
+            }
+            QComboBox::down-arrow {
+                width: 12px;
+                height: 12px;
+                image: url(down-arrow.png);  /* You can add a custom arrow image */
+            }
+            QComboBox QAbstractItemView {
+                background-color: white;
+                border: 2px solid #2962ff;
+                border-radius: 6px;
+                selection-background-color: #2962ff;
+                selection-color: white;
+                color: #1a1a1a;  /* Text color for dropdown items */
+                padding: 4px;
             }
         """)
+
         control_buttons.addWidget(self.lang_combo)
 
         right_layout.addLayout(control_buttons)
