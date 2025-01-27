@@ -10,7 +10,6 @@ from PySide6.QtGui import QImage, QPixmap, QFont
 from cvzone.HandTrackingModule import HandDetector
 from cvzone.ClassificationModule import Classifier
 
-
 # Detection Logic Class
 class SignLanguageDetector:
     def __init__(self):
