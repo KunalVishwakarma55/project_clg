@@ -5,6 +5,7 @@ from PySide6.QtGui import QFont ,QPixmap , QIcon
 from ui.Home import Home 
 from ui.STT import STT
 from ui.TTS import TTS
+from ui.lesson_ui import LessonUI
 class MainWindow(QWidget):
     def __init__(self):
         # Setup UI components
@@ -32,11 +33,15 @@ class MainWindow(QWidget):
         self.home = Home()
         self.STT = STT()
         self.TTS = TTS()
+        self.lesson = LessonUI()
 
         # Add tabs to stacked widget
         self.content_area.addWidget(self.home)
         self.content_area.addWidget(self.STT)
         self.content_area.addWidget(self.TTS)
+        self.content_area.addWidget(self.lesson)
+
+
     
     def create_nav_bar(self):
         # Sidebar container
@@ -55,7 +60,8 @@ class MainWindow(QWidget):
         nav_buttons = [
             ("Home", "assets/"),
             ("Sign to Text", "assets/"),
-            ("Text to Sign", "assets/")
+            ("Text to Sign", "assets/"),
+            ("ASL Lessons", "assets/")
         ]
         self.nav_button_dict = {}
 

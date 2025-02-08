@@ -1,20 +1,27 @@
+# Standard library imports
 import sys
-import cv2
 import os
 import re
+import subprocess
+from typing import List, Optional
+
+# Third-party imports
+import cv2
 import nltk
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 from nltk.corpus import wordnet
 from moviepy.editor import VideoFileClip, concatenate_videoclips, ColorClip
-from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                              QHBoxLayout, QLabel, QPushButton, QFrame, 
-                              QButtonGroup, QTextEdit, QGraphicsDropShadowEffect)
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QLabel, QPushButton, QFrame, QButtonGroup, QTextEdit,
+    QGraphicsDropShadowEffect, QSlider
+)
+from PySide6.QtCore import Qt, QUrl, QTimer
 from PySide6.QtGui import QFont, QPixmap, QColor
-from PySide6.QtMultimedia import QMediaPlayer,QAudioOutput
+from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
-import subprocess
+
 
 
 # Initialize NLTK components
@@ -65,51 +72,50 @@ def flatten_lists(lst):
             flat_list.append(i)
     return flat_list
 
-def text_to_sign(text, dataset, videos_path):
+def text_to_sign(text: str, dataset: List[str], videos_path: str) -> Optional[str]:
     output_path = "combined.avi"
-    
-    # Try multiple times to remove the file with small delays
-    for _ in range(3):
-        try:
-            if os.path.exists(output_path):
-                os.remove(output_path)
-            break
-        except PermissionError:
-            time.sleep(0.5)
-            continue
-    text = text.lower()
-    text = re.sub('[^a-z]+', ' ', text)
-    words = text.split()
-    words = parse_string(text, dataset)
-    words = remove_empty_values(words)
-    words = flatten_lists(words)
-
+    standard_size = (640, 480)
     clips = []
-    for i, word in enumerate(words):
-        word = re.sub('[^a-z]+', '', word)
-        video_path = os.path.join(videos_path, f"{word}.mp4")
-        if os.path.exists(video_path):
-            clip = VideoFileClip(video_path)
-            clips.append(clip.subclip(0, clip.duration // 2))
-            
-            # Only add space clip if it's not the last word
-            if i < len(words) - 1:
-                # Create a shorter space clip with matching dimensions
-                space_clip = ColorClip(
-                    size=clip.size,
-                    color=(255, 255, 255),
-                    duration=0.2  # Reduced duration
-                ).set_opacity(0.0)  # Make space clip transparent
-                clips.append(space_clip)
-
-    if clips:
-        # Clean up any existing output file
-        output_path = "combined.avi"
+    
+    try:
+        # Clean up existing output file
         if os.path.exists(output_path):
             os.remove(output_path)
             
-        result_clip = concatenate_videoclips(clips, method='compose')
-        result_clip.write_videofile(
+        # Process text
+        text = text.lower().strip()
+        text = re.sub('[^a-z]+', ' ', text)
+        words = parse_string(text, dataset)
+        words = remove_empty_values(words)
+        words = flatten_lists(words)
+        
+        # Process video clips
+        for i, word in enumerate(words):
+            word = re.sub('[^a-z]+', '', word)
+            video_path = os.path.join(videos_path, f"{word}.mp4")
+            
+            if not os.path.exists(video_path):
+                print(f"Warning: Video for word '{word}' not found")
+                continue
+                
+            clip = VideoFileClip(video_path)
+            clips.append(clip.resize(standard_size))
+            
+            # Add space between words
+            if i < len(words) - 1:
+                space_clip = ColorClip(
+                    size=standard_size,
+                    color=(255, 255, 255),
+                    duration=0.3
+                ).set_opacity(0.0)
+                clips.append(space_clip)
+                
+        if not clips:
+            return None
+            
+        # Combine and save video
+        final_clip = concatenate_videoclips(clips, method='compose')
+        final_clip.write_videofile(
             output_path,
             fps=30,
             codec='libx264',
@@ -117,31 +123,57 @@ def text_to_sign(text, dataset, videos_path):
             ffmpeg_params=['-crf', '23']
         )
         
-        # Close all clips to free up resources
+        return output_path
+        
+    except Exception as e:
+        print(f"Error processing video: {str(e)}")
+        return None
+        
+    finally:
+        # Clean up resources
         for clip in clips:
             clip.close()
-        result_clip.close()
-        
-        return output_path
-    return None
-
+        if 'final_clip' in locals():
+            final_clip.close()
 
 class TTS(QMainWindow):
     # In the MainWindow class, add text_input_style before setup_ui()
     def __init__(self):
         super().__init__()
+        # Add this line for processing state
+        self.is_processing = False
         
+        # Add these lines for video progress
+        self.progress_slider = QSlider(Qt.Horizontal)
+        self.progress_slider.setRange(0, 100)
+        self.progress_slider.sliderMoved.connect(self.seek_video)
         
+        # Add volume control
+        self.volume_slider = QSlider(Qt.Horizontal)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setValue(50)
+        self.volume_slider.valueChanged.connect(self.set_volume)
+
         self.audio_output = QAudioOutput()
         self.media_player = QMediaPlayer()
+        self.loading_spinner = LoadingSpinner(self)
+        self.loading_spinner.setMinimumSize(100, 100)
+        self.loading_spinner.hide()
+
+        self.animation_text = ["Processing", "Processing ⚫", "Processing ⚫⚫", "Processing ⚫⚫⚫"]
+        self.animation_index = 0
+        self.animation_timer = QTimer()
+        self.animation_timer.timeout.connect(self.update_animation)
+
         self.media_player.setAudioOutput(self.audio_output)
         self.audio_output.setVolume(0.5)  # 0.5 = 50% volume
 
 
 
+
         
         # Initialize dataset
-        self.dataset_path = "C:/Users/Ravi/Desktop/College_project/text-to-sign/Dataset"
+        self.dataset_path = "C:/Users/Ravi/Desktop/College_project/text-to-sign/Dataset/simplified_dataset"
         self.videos = os.listdir(self.dataset_path)
         self.video_names = [os.path.splitext(video)[0].replace("-", " ").lower() for video in self.videos]
         
@@ -204,7 +236,8 @@ class TTS(QMainWindow):
                 border-radius: 10px;
             }}
         """
-        
+
+
         self.setup_ui()
 
         
@@ -360,10 +393,35 @@ class TTS(QMainWindow):
         """)
         self.media_player.setVideoOutput(self.video_widget)
 
+        # Add loading spinner
+        self.init_animation_label = QLabel(self.video_widget)
+        self.init_animation_label.setAlignment(Qt.AlignCenter)
+        self.init_animation_label.setStyleSheet("""
+                QLabel {
+                    background-color: rgba(248, 250, 252, 0.9);
+                    border-radius: 12px;
+                    padding: 20px;
+                    font-size: 18px;
+                    font-weight: 600;
+                    color: #2962ff;
+                }
+            """)
+            
+            # Create animation text
+        self.animation_text = ["Initializing", "Initializing.", "Initializing..", "Initializing..."]
+        self.animation_index = 0
+            
+            # Setup animation timer
+        self.animation_timer = QTimer()
+        self.animation_timer.timeout.connect(self.update_animation)
+        self.animation_timer.start(500)  # Update every 500ms
+
         # Add after the video_widget in create_main_content method
         # Create video controls layout
         video_controls = QHBoxLayout()
         video_controls.setSpacing(10)
+        video_controls.addWidget(self.progress_slider)
+        video_controls.addWidget(self.volume_slider)
 
         # Create control buttons with icons
         self.play_pause_btn = QPushButton("Play")
@@ -472,23 +530,74 @@ class TTS(QMainWindow):
             self.audio_output.setMuted(True)
             self.mute_btn.setText("Unmute")
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self.loading_spinner:
+            video_rect = self.video_widget.geometry()
+            spinner_x = video_rect.x() + (video_rect.width() - self.loading_spinner.width()) // 2
+            spinner_y = video_rect.y() + (video_rect.height() - self.loading_spinner.height()) // 2
+            self.loading_spinner.move(spinner_x, spinner_y)
 
+    def show_loading_animation(self):
+        if self.loading_spinner:
+            self.loading_spinner.raise_()
+            self.loading_spinner.start()
+            self.animation_timer.start(500)
+
+    def hide_loading_animation(self):
+        if self.loading_spinner:
+            self.loading_spinner.stop()
+            self.animation_timer.stop()
+
+    def update_animation(self):
+        if self.loading_spinner and self.loading_spinner.isVisible():
+            self.animation_index = (self.animation_index + 1) % len(self.animation_text)
+            self.loading_spinner.update()
+
+
+    def handle_media_status(self, status):
+        if status == QMediaPlayer.MediaStatus.LoadingMedia:
+            if self.loading_spinner:
+                self.loading_spinner.raise_()  # Ensures spinner stays on top
+                self.loading_spinner.start()
+        elif status == QMediaPlayer.MediaStatus.LoadedMedia:
+            if self.loading_spinner:
+                self.loading_spinner.stop()
+        elif status == QMediaPlayer.MediaStatus.InvalidMedia:
+            if self.loading_spinner:
+                self.loading_spinner.stop()
 
     def send_text(self):
-        # Release the media player resources
+        if self.is_processing:
+            return
+            
+        self.is_processing = True
+        self.show_loading_animation()
+        
+        # Stop current playback
         self.media_player.stop()
         self.media_player.setSource("")
         
-        text = self.text_input.toPlainText()
-        output_path = text_to_sign(text, self.video_names, self.dataset_path)
-        
-        if output_path and os.path.exists(output_path):
-            self.media_player.setSource(output_path)
-            self.media_player.play()
-            self.play_pause_btn.setText("Pause")
-            self.mute_btn.setText("Mute")
+        # Process in background
+        QTimer.singleShot(0, self._process_text)
 
-
+    def _process_text(self):
+        try:
+            text = self.text_input.toPlainText()
+            if not text.strip():
+                return
+                
+            output_path = text_to_sign(text, self.video_names, self.dataset_path)
+            
+            if output_path and os.path.exists(output_path):
+                video_url = QUrl.fromLocalFile(os.path.abspath(output_path))
+                self.media_player.setSource(video_url)
+                self.media_player.play()
+                self.play_pause_btn.setText("Pause")
+                self.mute_btn.setText("Mute")
+        finally:
+            self.is_processing = False
+            self.hide_loading_animation()
 
 
     def clear_text(self):
@@ -499,6 +608,39 @@ class TTS(QMainWindow):
 
     def paste_text(self):
         self.text_input.paste()
+    def update_animation(self):
+        if hasattr(self, 'init_animation_label'):
+            self.animation_index = (self.animation_index + 1) % len(self.animation_text)
+            self.init_animation_label.setText(self.animation_text[self.animation_index])
+
+    def seek_video(self, position):
+        if self.media_player.duration() > 0:
+            # Convert to integer using round() to avoid float errors
+            new_position = round((position / 100.0) * self.media_player.duration())
+            self.media_player.setPosition(new_position)
+
+            
+    def set_volume(self, volume):
+        self.audio_output.setVolume(volume / 100.0)
+
+    def _process_text(self):
+        try:
+            text = self.text_input.toPlainText()
+            if not text.strip():
+                return
+                
+            self.media_player.stop()
+            output_path = text_to_sign(text, self.video_names, self.dataset_path)
+            
+            if output_path:
+                video_url = QUrl.fromLocalFile(os.path.abspath(output_path))
+                self.media_player.setSource(video_url)
+                self.media_player.play()
+                self.update_player_controls()
+        finally:
+            self.is_processing = False
+            self.hide_loading_animation()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
