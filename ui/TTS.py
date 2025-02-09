@@ -21,6 +21,7 @@ from PySide6.QtCore import Qt, QUrl, QTimer
 from PySide6.QtGui import QFont, QPixmap, QColor
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
+from ui.loading_spinner import LoadingSpinner
 
 
 
@@ -622,6 +623,22 @@ class TTS(QMainWindow):
             
     def set_volume(self, volume):
         self.audio_output.setVolume(volume / 100.0)
+
+    def update_player_controls(self):
+        # Update play/pause button text
+        if self.media_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+            self.play_pause_btn.setText("Pause")
+        else:
+            self.play_pause_btn.setText("Play")
+            
+        # Update mute button text
+        if self.audio_output.isMuted():
+            self.mute_btn.setText("Unmute")
+        else:
+            self.mute_btn.setText("Mute")
+            
+        # Update volume slider
+        self.volume_slider.setValue(int(self.audio_output.volume() * 100))
 
     def _process_text(self):
         try:
