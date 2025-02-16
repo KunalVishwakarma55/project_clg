@@ -7,6 +7,8 @@ from PySide6.QtMultimediaWidgets import QVideoWidget
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput, QSoundEffect
 from PySide6.QtCore import Qt, QTimer, QUrl, QPropertyAnimation, QEasingCurve, QPoint
 from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import QSizePolicy
+from PySide6.QtCore import QSize
 
 class IntermediateMode(QWidget):
     def __init__(self):
@@ -21,7 +23,13 @@ class IntermediateMode(QWidget):
         # Initialize timer
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_timer)
-        
+
+        self.bonus_multiplier = 1
+        self.bonus_duration = 30  # Duration in seconds
+        self.bonus_timer = QTimer()
+        self.bonus_timer.timeout.connect(self.update_bonus_timer)
+        self.remaining_bonus_time = 0
+
         # Initialize choice buttons
         self.choice_buttons = []
         for _ in range(4):
@@ -43,13 +51,100 @@ class IntermediateMode(QWidget):
             self.choice_buttons.append(btn)
 
         # Gestures dictionary
+        # Gestures dictionary
         self.gestures = {
             'hello': 'Hello',
             'thank_you': 'Thank You',
             'please': 'Please',
             'sorry': 'Sorry',
             'good': 'Good',
-            'bad': 'Bad'
+            'bad': 'Bad',
+            'alligator':'Alligator',
+            'apple':'Apple',
+            'april':'April',
+            'august':'August',
+            'banana':'Banana',
+            'bear':'Bear',
+            'cabbage':'Cabbage',
+            'camel':'Camel',
+            'carrot':'Carrot',
+            'cat':'Cat',
+            'cherry':'Cherry',
+            'coconut':'Coconut',
+            'corn':'Corn',
+            'cow':'Cow',
+            'december':'December',
+            'deer':'Deer',
+            'dog':'Dog',
+            'dolphin':'Dolphin',
+            'duck':'Duck',
+            'eagle':'Eagle',
+            'elephant':'Elephant',
+            'february':'February',
+            'fish':'Fish',
+            'fox':'Fox',
+            'friday':'Friday',
+            'frog':'Frog',
+            'giraffe':'Giraffe',
+            'goat':'Goat',
+            'gorilla':'Gorilla',
+            'grapes':'Grapes',
+            'horse':'Horse',
+            'january':'January',
+            'july':'July',
+            'june':'June',
+            'kangaroo':'Kangaroo',
+            'lettuce':'Lettuce',
+            'lion':'Lion',
+            'march':'March',
+            'monday':'Monday',
+            'mouse':'Mouse',
+            'mushroom':'Mushroom',
+            'november':'November',
+            'october':'October',
+            'onion':'Onion',
+            'orange':'Orange',
+            'owl':'Owl',
+            'peach':'Peach',
+            'pear':'Pear',
+            'pepper':'Pepper',
+            'pig':'Pig',
+            'potato':'Potato',
+            'pumpkin':'Pumpkin',
+            'rabbit':'Rabbit',
+            'raccoon':'Raccoon',
+            'rat':'Rat',
+            'saturday':'Saturday',
+            'september':'September',
+            'sheep':'Sheep',
+            'snake':'Snake',
+            'squirrel':'Squirrel',
+            'sunday':'Sunday',
+            'thursday':'Thursday',
+            'tiger':'Tiger',
+            'tomato':'Tomato',
+            'tuesday':'Tuesday',
+            'turtle':'Turtle',
+            'watermelon':'Watermelon',
+            'wednesday':'Wednesday',
+            'whale':'Whale',
+            'wolf':'Wolf',
+            'goodbye':'Goodbye',
+            'yes':'Yes',
+            'no':'No',
+            'help':'Help',
+            'stop':'Stop',
+            'eat':'Eat',
+            'drink':'Drink',
+            'sleep':'Sleep',
+            'go':'Go',
+            'come':'Come',
+            'want':'Want',
+            'need':'Need',
+            'like':'Like',
+            'work':'Work',
+            'play':'Play'
+
         }
 
         # Statistics dictionary
@@ -64,6 +159,24 @@ class IntermediateMode(QWidget):
         self.init_ui()
         self.setup_video_player()
         self.setup_sounds()
+    def animate_button_scale(self, button, scale_factor=1.1):
+        """Animate the button to scale up on hover."""
+        animation = QPropertyAnimation(button, b"size")
+        animation.setDuration(200)  # Animation duration in milliseconds
+        original_size = button.size()
+        new_size = QSize(original_size.width() * scale_factor, original_size.height() * scale_factor)
+        animation.setStartValue(original_size)
+        animation.setEndValue(new_size)
+        animation.setEasingCurve(QEasingCurve.OutBack)  # Smooth easing curve
+        return animation
+
+    def enterEvent(self, event):
+        """Handle mouse enter event for bonus button."""
+        self.animate_button_scale(self.bonus_button).start()
+
+    def leaveEvent(self, event):
+        """Handle mouse leave event for bonus button."""
+        self.animate_button_scale(self.bonus_button, 1.0).start()
 
     def init_ui(self):
         """Initialize the user interface."""
@@ -71,6 +184,7 @@ class IntermediateMode(QWidget):
 
         # Left Frame - Video Display
         left_frame = QFrame()
+        left_frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         left_frame.setStyleSheet("""
             QFrame {
                 background-color: #ffffff;
@@ -83,6 +197,7 @@ class IntermediateMode(QWidget):
 
         # Stats Panel
         stats_frame = QFrame()
+        stats_frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         stats_frame.setStyleSheet("""
             QFrame {
                 background-color: #f8f9fa;
@@ -98,6 +213,7 @@ class IntermediateMode(QWidget):
         self.level_label = QLabel("Level: 1")
 
         for label in [self.streak_label, self.best_streak_label, self.level_label]:
+            label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             label.setStyleSheet("""
                 font-size: 18px;
                 color: #2c3e50;
@@ -111,6 +227,7 @@ class IntermediateMode(QWidget):
         # Video Title
         video_title = QLabel("ASL Gesture")
         video_title.setAlignment(Qt.AlignCenter)
+        video_title.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         video_title.setStyleSheet("""
             font-size: 24px;
             color: #2c3e50;
@@ -121,6 +238,7 @@ class IntermediateMode(QWidget):
         # Practice Mode Toggle
         self.practice_mode_btn = QPushButton("Practice Mode 📚")
         self.practice_mode_btn.setCheckable(True)
+        self.practice_mode_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.practice_mode_btn.setStyleSheet("""
             QPushButton {
                 background-color: #95a5a6;
@@ -139,7 +257,7 @@ class IntermediateMode(QWidget):
 
         # Video Player
         self.video_widget = QVideoWidget()
-        self.video_widget.setMinimumSize(400, 400)
+        self.video_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         # Video Controls
         controls_layout = QHBoxLayout()
@@ -148,6 +266,7 @@ class IntermediateMode(QWidget):
         self.hint_button = QPushButton("Hint (Cost: 5 points)")
 
         for button in [self.play_button, self.replay_button, self.hint_button]:
+            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             button.setStyleSheet("""
                 QPushButton {
                     background-color: #3498db;
@@ -172,6 +291,7 @@ class IntermediateMode(QWidget):
 
         # Start Button
         self.start_button = QPushButton("Start Learning!")
+        self.start_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.start_button.setStyleSheet("""
             QPushButton {
                 background-color: #27ae60;
@@ -197,6 +317,7 @@ class IntermediateMode(QWidget):
 
         # Right Frame
         right_frame = QFrame()
+        right_frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         right_frame.setStyleSheet("""
             QFrame {
                 background-color: #ffffff;
@@ -209,13 +330,42 @@ class IntermediateMode(QWidget):
 
         # Score and Timer Panel
         score_frame = QFrame()
+        score_frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         score_layout = QHBoxLayout(score_frame)
 
         self.score_label = QLabel(f"Score: {self.score}")
         self.timer_label = QLabel(f"Time: {self.time_remaining}s")
-        self.bonus_label = QLabel("")
+        self.bonus_button = QPushButton("🎁 2X Bonus")
+        self.bonus_button.setCheckable(True)
+        self.bonus_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.bonus_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                                        stop:0 #f1c40f, stop:1 #f39c12);
+                color: white;
+                border-radius: 12px;
+                padding: 8px 15px;
+                font-size: 16px;
+                font-weight: bold;
+                border: 2px solid #fff;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                                        stop:0 #f39c12, stop:1 #e67e22);
+            }
+            QPushButton:checked {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                                        stop:0 #e74c3c, stop:1 #c0392b);
+            }
+        """)
+        self.bonus_button.clicked.connect(self.toggle_bonus_multiplier)
+
+        # Connect hover events for bonus button
+        self.bonus_button.enterEvent = self.enterEvent
+        self.bonus_button.leaveEvent = self.leaveEvent
 
         for label in [self.score_label, self.timer_label]:
+            label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             label.setStyleSheet("""
                 font-size: 22px;
                 color: #2c3e50;
@@ -225,16 +375,18 @@ class IntermediateMode(QWidget):
 
         score_layout.addWidget(self.score_label)
         score_layout.addWidget(self.timer_label)
-        score_layout.addWidget(self.bonus_label)
+        score_layout.addWidget(self.bonus_button)
 
         right_layout.addWidget(score_frame)
 
         # Add choice buttons
         for btn in self.choice_buttons:
+            btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             right_layout.addWidget(btn)
 
         # Statistics Button
         stats_btn = QPushButton("View Statistics 📊")
+        stats_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         stats_btn.setStyleSheet("""
             QPushButton {
                 background-color: #9b59b6;
@@ -245,11 +397,15 @@ class IntermediateMode(QWidget):
                 padding: 10px;
                 margin: 5px;
             }
+            QPushButton:hover {
+                background-color: #8e44ad;
+            }
         """)
         stats_btn.clicked.connect(self.show_statistics)
 
         # Back Button
         back_btn = QPushButton("← Back to Modes")
+        back_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         back_btn.clicked.connect(self.go_back_to_modes)
         back_btn.setStyleSheet("""
             QPushButton {
@@ -269,6 +425,20 @@ class IntermediateMode(QWidget):
 
         main_layout.addWidget(left_frame)
         main_layout.addWidget(right_frame)
+
+    def animate_button_scale(self, button, scale_factor=1.1):
+        """Animate the button to scale up on hover."""
+        animation = QPropertyAnimation(button, b"size")
+        animation.setDuration(200)  # Animation duration in milliseconds
+        original_size = button.size()
+        new_size = QSize(original_size.width() * scale_factor, original_size.height() * scale_factor)
+        animation.setStartValue(original_size)
+        animation.setEndValue(new_size)
+        animation.setEasingCurve(QEasingCurve.OutBack)  # Smooth easing curve
+        return animation
+
+    # Rest of the code remains unchanged...
+
 
     def setup_video_player(self):
         """Initialize the video player and audio output."""
@@ -355,85 +525,231 @@ class IntermediateMode(QWidget):
             self.timer_label.setText(f"Time: {self.time_remaining}s")
             self.start_button.setEnabled(False)  # Prevent multiple starts
 
-
-    def show_statistics(self):
-        """Display performance statistics."""
-        accuracy = (self.stats['correct_answers'] / max(1, self.stats['total_attempts'])) * 100
-        
-        # Create a semi-transparent overlay
-        overlay = QLabel(self)
-        overlay.setStyleSheet("background-color: rgba(0, 0, 0, 0.7);")
-        overlay.setGeometry(self.rect())
-        overlay.show()
-        
-        stats_window = QLabel(self)
-        stats_text = f"""
-            📊 Performance Statistics:
-
-            Total Attempts: {self.stats['total_attempts']}
-            Correct Answers: {self.stats['correct_answers']}
-            Accuracy: {accuracy:.1f}%
-            Average Response Time: {self.stats['average_time']:.1f}s
-            Best Response Time: {self.stats['best_time']:.1f}s
-            Best Streak: {self.best_streak}
-            Current Score: {self.score}
-        """
-        
-        stats_window.setText(stats_text)
-        stats_window.setStyleSheet("""
+    def show_bonus_points(self, bonus_points):
+        """Display animated bonus points notification."""
+        bonus_label = QLabel(f"+{bonus_points} BONUS! 🌟", self)
+        bonus_label.setStyleSheet("""
             QLabel {
-                background-color: white;
-                padding: 30px;
-                border: 2px solid #3498db;
-                border-radius: 15px;
-                font-size: 18px;
+                background-color: #f1c40f;
                 color: #2c3e50;
+                padding: 15px 25px;
+                border-radius: 15px;
                 font-weight: bold;
+                font-size: 22px;
+                border: 2px solid #f39c12;
             }
         """)
-        stats_window.adjustSize()
-        stats_window.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        bonus_label.adjustSize()
         
-        # Center the stats window
-        stats_window.move(
-            self.width() // 2 - stats_window.width() // 2,
-            self.height() // 2 - stats_window.height() // 2
+        # Initial position
+        bonus_label.move(
+            self.score_label.x() + self.score_label.width() + 20,
+            self.score_label.y()
         )
-        stats_window.show()
+        bonus_label.show()
         
-        QTimer.singleShot(5000, lambda: [overlay.deleteLater(), stats_window.deleteLater()])
-
-
-    def show_level_transition(self, new_level):
-        """Show level up animation and message"""
-        level_label = QLabel(f"Level Up! 🎮\nYou reached Level {new_level}", self)
-        level_label.setStyleSheet("""
-            background-color: #2ecc71;
-            color: white;
-            padding: 20px;
-            border-radius: 15px;
-            font-size: 24px;
-            font-weight: bold;
-        """)
-        level_label.setAlignment(Qt.AlignCenter)
-        level_label.adjustSize()
-        
-        level_label.move(
-            self.width() // 2 - level_label.width() // 2,
-            self.height() // 2 - level_label.height() // 2
-        )
-        
-        level_label.show()
-        
-        anim = QPropertyAnimation(level_label, b"pos")
-        anim.setDuration(1000)
-        anim.setStartValue(level_label.pos())
-        anim.setKeyValueAt(0.5, level_label.pos() + QPoint(0, -30))
-        anim.setEndValue(level_label.pos())
+        # Create bounce and fade animation
+        anim = QPropertyAnimation(bonus_label, b"pos")
+        anim.setDuration(1500)
+        anim.setStartValue(bonus_label.pos())
+        anim.setKeyValueAt(0.3, bonus_label.pos() + QPoint(0, -40))
+        anim.setKeyValueAt(0.6, bonus_label.pos() + QPoint(0, -30))
+        anim.setEndValue(bonus_label.pos() + QPoint(0, -20))
         anim.setEasingCurve(QEasingCurve.OutBounce)
         anim.start()
         
-        QTimer.singleShot(2000, level_label.deleteLater)
+        # Remove the label after animation
+        QTimer.singleShot(1500, bonus_label.deleteLater)
+
+    def toggle_bonus_multiplier(self):
+        """Toggle the bonus score multiplier."""
+        if self.bonus_button.isChecked():
+            self.bonus_multiplier = 2
+            self.remaining_bonus_time = self.bonus_duration
+            self.bonus_timer.start(1000)  # Update every second
+            self.bonus_button.setText(f"🔥 2X ({self.remaining_bonus_time}s)")
+        else:
+            self.reset_bonus()
+    
+    def update_bonus_timer(self):
+        """Update the bonus timer countdown."""
+        self.remaining_bonus_time -= 1
+        self.bonus_button.setText(f"🔥 2X ({self.remaining_bonus_time}s)")
+        
+        if self.remaining_bonus_time <= 0:
+            self.reset_bonus()
+
+    def reset_bonus(self):
+        """Reset bonus multiplier and button state."""
+        self.bonus_multiplier = 1
+        self.bonus_timer.stop()
+        self.bonus_button.setChecked(False)
+        self.bonus_button.setText("🎁 2X Bonus")
+    
+    def close_statistics(self):
+        """Close the statistics overlay."""
+        if hasattr(self, 'overlay') and self.overlay:
+            self.overlay.hide()
+            self.overlay.deleteLater()
+            del self.overlay  # Remove reference to the overlay
+
+        # Show the video widget again
+        self.video_widget.show()
+
+
+    def show_statistics(self):
+        """Display performance statistics with enhanced UI."""
+        # Hide the video widget
+        self.video_widget.hide()
+
+        # Calculate accuracy
+        accuracy = (self.stats['correct_answers'] / max(1, self.stats['total_attempts'])) * 100
+
+        # Create a semi-transparent overlay
+        self.overlay = QFrame(self)  # Store overlay as an instance variable
+        self.overlay.setStyleSheet("""
+            QFrame {
+                background-color: rgba(0, 0, 0, 0.7);
+            }
+        """)
+        self.overlay.setGeometry(self.rect())
+
+        # Create stats container with animation
+        stats_container = QFrame(self.overlay)
+        stats_container.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border: 3px solid #3498db;
+                border-radius: 20px;
+                padding: 25px;
+            }
+        """)
+
+        stats_layout = QVBoxLayout(stats_container)
+
+        # Add stats content
+        title = QLabel("🏆 Performance Dashboard")
+        title.setStyleSheet("""
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+        """)
+        stats_layout.addWidget(title, alignment=Qt.AlignCenter)
+
+        stats_text = f"""
+            🎯 Total Attempts: {self.stats['total_attempts']}
+            ✅ Correct Answers: {self.stats['correct_answers']}
+            📊 Accuracy: {accuracy:.1f}%
+            ⏱️ Average Response: {self.stats['average_time']:.1f}s
+            🚀 Best Response: {self.stats['best_time']:.1f}s
+            🔥 Best Streak: {self.best_streak}
+            💫 Current Score: {self.score}
+        """
+        stats_content = QLabel(stats_text)
+        stats_content.setStyleSheet("""
+            font-size: 20px;
+            color: #2c3e50;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            margin: 10px;
+        """)
+        stats_layout.addWidget(stats_content, alignment=Qt.AlignCenter)
+
+        # Close button with hover effect
+        close_btn = QPushButton("Close Dashboard")
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3498db;
+                color: white;
+                padding: 12px 25px;
+                border-radius: 12px;
+                font-size: 18px;
+                font-weight: bold;
+                min-width: 150px;
+            }
+            QPushButton:hover {
+                background-color: #2980b9;
+                transform: scale(1.05);
+            }
+        """)
+        close_btn.clicked.connect(self.close_statistics)
+        stats_layout.addWidget(close_btn, alignment=Qt.AlignCenter)
+
+        # Center the container
+        overlay_layout = QVBoxLayout(self.overlay)
+        overlay_layout.addWidget(stats_container, alignment=Qt.AlignCenter)
+
+        # Show with fade-in effect
+        self.overlay.show()
+        stats_container.raise_()  # Bring the stats container to the front
+
+
+    def show_level_transition(self, new_level):
+        """Show level up animation and message with a semi-transparent overlay."""
+        # Hide the video widget
+        self.video_widget.hide()
+
+        # Create a semi-transparent overlay
+        self.level_overlay = QFrame(self)
+        self.level_overlay.setStyleSheet("background-color: rgba(0, 0, 0, 0.7);")  # Semi-transparent black
+        self.level_overlay.setGeometry(self.rect())  # Cover the entire widget
+
+        # Create a container for the level-up message
+        level_container = QFrame(self.level_overlay)
+        level_container.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border: 3px solid #3498db;
+                border-radius: 20px;
+                padding: 25px;
+            }
+        """)
+        level_container.setFixedSize(400, 200)  # Set a fixed size for the container
+
+        # Add the level-up message
+        level_label = QLabel(f"Level Up! 🎮\nYou reached Level {new_level}", level_container)
+        level_label.setStyleSheet("""
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+        """)
+        level_label.setAlignment(Qt.AlignCenter)
+
+        # Layout for the container
+        level_layout = QVBoxLayout(level_container)
+        level_layout.addWidget(level_label, alignment=Qt.AlignCenter)
+
+        # Center the container within the overlay
+        level_container.move(
+            self.level_overlay.width() // 2 - level_container.width() // 2,
+            self.level_overlay.height() // 2 - level_container.height() // 2
+        )
+
+        # Show the overlay and container
+        self.level_overlay.show()
+        level_container.show()
+
+        # Animate the container (optional: add a bounce effect)
+        anim = QPropertyAnimation(level_container, b"pos")
+        anim.setDuration(1000)
+        anim.setStartValue(level_container.pos())
+        anim.setKeyValueAt(0.5, level_container.pos() + QPoint(0, -30))
+        anim.setEndValue(level_container.pos())
+        anim.setEasingCurve(QEasingCurve.OutBounce)
+        anim.start()
+
+        # Remove the overlay and container after the animation
+        QTimer.singleShot(2000, lambda: (self.level_overlay.deleteLater(), level_container.deleteLater()))
+
+        # Show the video widget again after the animation is complete
+        QTimer.singleShot(2000, self.video_widget.show)
 
     def show_success_emoji(self):
         """Show a success emoji animation."""
@@ -594,8 +910,13 @@ class IntermediateMode(QWidget):
         
         # Calculate score and bonus
         time_bonus = max(0, self.time_remaining)
-        bonus_points = time_bonus * 2
-        self.score += 10 + bonus_points
+        bonus_points = time_bonus * 2 * self.bonus_multiplier  # Apply multiplier
+        self.score += (10 * self.bonus_multiplier) + bonus_points  # Apply multiplier to base score too
+        
+        # Show bonus animation if there are bonus points
+        if bonus_points > 0:
+            self.show_bonus_points(bonus_points)
+        
         
         # Update UI
         self.score_label.setText(f"Score: {self.score} ✨")
