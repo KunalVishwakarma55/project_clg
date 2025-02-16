@@ -339,7 +339,15 @@ class STT(QMainWindow):
                     char_label.setText(sign)
 
     def start_camera(self):
+        print("Starting camera...")
+        if not self.detector.cap.isOpened():
+            self.detector.cap = cv2.VideoCapture(0)
+            if not self.detector.cap.isOpened():
+                print("Failed to open camera")
+                return
+        print("Camera opened successfully")
         self.detecting = True
+
 
     def stop_camera(self):
         self.detecting = False
