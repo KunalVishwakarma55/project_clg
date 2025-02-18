@@ -625,3 +625,8 @@ class BeginnerMode(QWidget):
     def go_back_to_modes(self):
         self.timer.stop()
         self.parent().setCurrentIndex(0)
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = BeginnerMode()
+    window.show()
+    sys.exit(app.exec())

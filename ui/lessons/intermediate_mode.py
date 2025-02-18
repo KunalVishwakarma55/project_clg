@@ -1010,4 +1010,10 @@ class IntermediateMode(QWidget):
         except:
             pass
 
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = IntermediateMode()
+    window.show()
+    sys.exit(app.exec())
+
 

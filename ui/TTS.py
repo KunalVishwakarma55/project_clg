@@ -44,22 +44,50 @@ def get_wordnet_pos(tag):
         return wordnet.NOUN
 
 def parse_string(string, dataset):
-    parsed_list = []
-    start = 0
-    end = len(string)
-    while start < end:
-        max_chunk = ""
-        max_length = 0
-        for chunk in dataset:
-            if string.startswith(chunk.lower(), start) and len(chunk) > max_length:
-                max_chunk = chunk
-                max_length = len(chunk)
-        if max_chunk:
-            parsed_list.append(max_chunk)
-            start += len(max_chunk)
+    dataset_lower = [d.lower() for d in dataset]
+    case_mapping = dict(zip(dataset_lower, dataset))
+    
+    # Identify sentence type
+    sentence_type = 'statement'  # default
+    if '?' in string:
+        sentence_type = 'question'
+    elif '!' in string:
+        sentence_type = 'exclamation'
+    
+    # Clean and normalize input while preserving meaning
+    string = string.lower().strip()
+    string = re.sub(r'[^a-z\s?!]', '', string)
+    
+    # Special handling for different sentence types
+    words = string.split()
+    result = []
+    i = 0
+    
+    # Add sentence type indicator if available
+    if sentence_type == 'question' and 'question' in dataset_lower:
+        result.append(case_mapping['question'])
+    elif sentence_type == 'exclamation' and 'exclamation' in dataset_lower:
+        result.append(case_mapping['exclamation'])
+    
+    while i < len(words):
+        # Try matching phrases
+        for j in range(len(words), i, -1):
+            phrase = ' '.join(words[i:j])
+            clean_phrase = phrase.replace('?', '').replace('!', '')
+            if clean_phrase in dataset_lower:
+                result.append(case_mapping[clean_phrase])
+                i = j
+                break
         else:
-            start += 1
-    return parsed_list
+            # Handle individual words
+            word = words[i].replace('?', '').replace('!', '')
+            if word in dataset_lower:
+                result.append(case_mapping[word])
+            i += 1
+    
+    return result
+
+
 
 def remove_empty_values(lst):
     return [x for x in lst if x]
@@ -79,30 +107,37 @@ def text_to_sign(text: str, dataset: List[str], videos_path: str) -> Optional[st
     clips = []
     
     try:
-        # Clean up existing output file
         if os.path.exists(output_path):
             os.remove(output_path)
             
-        # Process text
         text = text.lower().strip()
-        text = re.sub('[^a-z]+', ' ', text)
+        text = re.sub('[^a-z0-9\s]+', ' ', text)
         words = parse_string(text, dataset)
         words = remove_empty_values(words)
         words = flatten_lists(words)
         
-        # Process video clips
         for i, word in enumerate(words):
-            word = re.sub('[^a-z]+', '', word)
-            video_path = os.path.join(videos_path, f"{word}.mp4")
+            # Try different filename formats
+            possible_filenames = [
+                f"{word}.mp4",
+                f"{word.replace(' ', '-')}.mp4",
+                f"{word.replace(' ', '')}.mp4"
+            ]
             
-            if not os.path.exists(video_path):
-                print(f"Warning: Video for word '{word}' not found")
+            video_path = None
+            for filename in possible_filenames:
+                temp_path = os.path.join(videos_path, filename)
+                if os.path.exists(temp_path):
+                    video_path = temp_path
+                    break
+            
+            if not video_path:
+                print(f"Warning: Video for '{word}' not found")
                 continue
                 
             clip = VideoFileClip(video_path)
             clips.append(clip.resize(standard_size))
             
-            # Add space between words
             if i < len(words) - 1:
                 space_clip = ColorClip(
                     size=standard_size,
@@ -114,7 +149,6 @@ def text_to_sign(text: str, dataset: List[str], videos_path: str) -> Optional[st
         if not clips:
             return None
             
-        # Combine and save video
         final_clip = concatenate_videoclips(clips, method='compose')
         final_clip.write_videofile(
             output_path,
@@ -131,11 +165,12 @@ def text_to_sign(text: str, dataset: List[str], videos_path: str) -> Optional[st
         return None
         
     finally:
-        # Clean up resources
         for clip in clips:
             clip.close()
         if 'final_clip' in locals():
             final_clip.close()
+
+
 
 class TTS(QMainWindow):
     # In the MainWindow class, add text_input_style before setup_ui()
@@ -176,7 +211,7 @@ class TTS(QMainWindow):
         # Initialize dataset
         self.dataset_path = "C:/Users/Ravi/Desktop/College_project/text-to-sign/Dataset/simplified_dataset"
         self.videos = os.listdir(self.dataset_path)
-        self.video_names = [os.path.splitext(video)[0].replace("-", " ").lower() for video in self.videos]
+        self.video_names = [os.path.splitext(video)[0].replace('-', ' ').lower() for video in self.videos]
         
         # Modern color palette
         self.colors = {
