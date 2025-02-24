@@ -6,6 +6,7 @@ from ui.Home import Home
 from ui.STT import STT
 from ui.TTS import TTS
 from ui.lesson_ui import LessonUI
+from ui.learning import LearningSection
 class MainWindow(QWidget):
     def __init__(self):
         # Setup UI components
@@ -34,12 +35,14 @@ class MainWindow(QWidget):
         self.STT = STT()
         self.TTS = TTS()
         self.lesson = LessonUI()
+        self.learning = LearningSection()
 
         # Add tabs to stacked widget
         self.content_area.addWidget(self.home)
         self.content_area.addWidget(self.STT)
         self.content_area.addWidget(self.TTS)
         self.content_area.addWidget(self.lesson)
+        self.content_area.addWidget(self.learning)
 
 
     
@@ -61,7 +64,8 @@ class MainWindow(QWidget):
             ("Home", "assets/"),
             ("Sign to Text", "assets/"),
             ("Text to Sign", "assets/"),
-            ("ASL Lessons", "assets/")
+            ("ASL Lessons", "assets/"),
+            ("Learning", "assets/")  
         ]
         self.nav_button_dict = {}
 

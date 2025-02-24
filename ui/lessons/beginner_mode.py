@@ -276,9 +276,10 @@ class BeginnerMode(QWidget):
             btn.clicked.connect(lambda checked, b=btn: self.check_answer(b.text()))
             self.choice_buttons.append(btn)
             choice_layout.addWidget(btn, 0, Qt.AlignCenter)
-        # Skip Button
+       # Skip Button
         self.skip_button = QPushButton("Skip →")
-        self.skip_button.setFixedWidth(550)  # Matched with choice buttons
+        self.skip_button.setFixedHeight(55)  # Added this line
+        self.skip_button.setFixedWidth(550)
         self.skip_button.setStyleSheet("""
             QPushButton {
                 background-color: #f39c12;
@@ -287,7 +288,7 @@ class BeginnerMode(QWidget):
                 font-size: 18px;
                 font-weight: bold;
                 padding: 10px 20px;
-                margin: 10px;
+                margin: 6px;
                 border: 2px solid #e67e22;
             }
             QPushButton:hover {
@@ -295,6 +296,10 @@ class BeginnerMode(QWidget):
             }
         """)
         self.skip_button.clicked.connect(self.skip_question)
+        choice_layout.addWidget(self.skip_button, 0, Qt.AlignCenter)
+
+
+
 
         # Statistics Button
         stats_btn = QPushButton("View Statistics 📊")
@@ -337,7 +342,7 @@ class BeginnerMode(QWidget):
         right_layout.addWidget(score_frame)
         right_layout.addWidget(question_label)
         right_layout.addLayout(choice_layout)
-        right_layout.addWidget(self.skip_button)
+        # right_layout.addWidget(self.skip_button)
         right_layout.addWidget(stats_btn)
         right_layout.addStretch()
         right_layout.addWidget(back_btn)

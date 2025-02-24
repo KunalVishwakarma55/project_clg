@@ -48,44 +48,58 @@ def parse_string(string, dataset):
     case_mapping = dict(zip(dataset_lower, dataset))
     
     # Identify sentence type
-    sentence_type = 'statement'  # default
+    sentence_type = 'statement'
     if '?' in string:
         sentence_type = 'question'
     elif '!' in string:
         sentence_type = 'exclamation'
     
-    # Clean and normalize input while preserving meaning
+    # Clean and normalize input
     string = string.lower().strip()
-    string = re.sub(r'[^a-z\s?!]', '', string)
     
-    # Special handling for different sentence types
+    # Split into words and process each word
     words = string.split()
     result = []
     i = 0
     
-    # Add sentence type indicator if available
+    # Add sentence type indicator
     if sentence_type == 'question' and 'question' in dataset_lower:
         result.append(case_mapping['question'])
     elif sentence_type == 'exclamation' and 'exclamation' in dataset_lower:
         result.append(case_mapping['exclamation'])
     
     while i < len(words):
+        # Check if the word is a number
+        if words[i].isdigit() and int(words[i]) < 10:
+            result.append(words[i])  # Directly use the number for video filename
+            i += 1
+            continue
+            
         # Try matching phrases
+        phrase_found = False
         for j in range(len(words), i, -1):
             phrase = ' '.join(words[i:j])
             clean_phrase = phrase.replace('?', '').replace('!', '')
             if clean_phrase in dataset_lower:
                 result.append(case_mapping[clean_phrase])
                 i = j
+                phrase_found = True
                 break
-        else:
-            # Handle individual words
+        
+        if not phrase_found:
+            # Handle individual words or letters
             word = words[i].replace('?', '').replace('!', '')
             if word in dataset_lower:
                 result.append(case_mapping[word])
+            else:
+                # Break into individual letters
+                for letter in word:
+                    if letter in dataset_lower:
+                        result.append(case_mapping[letter])
             i += 1
     
     return result
+
 
 
 
@@ -176,19 +190,16 @@ class TTS(QMainWindow):
     # In the MainWindow class, add text_input_style before setup_ui()
     def __init__(self):
         super().__init__()
+
+        self.speed_slider = QSlider(Qt.Horizontal)
+        self.speed_slider.setMinimum(25)
+        self.speed_slider.setMaximum(200)
+        self.speed_slider.setValue(100)
+        
+        # Connect the slider signal to the slot
+        self.speed_slider.valueChanged.connect(self.update_speed)
         # Add this line for processing state
         self.is_processing = False
-        
-        # Add these lines for video progress
-        self.progress_slider = QSlider(Qt.Horizontal)
-        self.progress_slider.setRange(0, 100)
-        self.progress_slider.sliderMoved.connect(self.seek_video)
-        
-        # Add volume control
-        self.volume_slider = QSlider(Qt.Horizontal)
-        self.volume_slider.setRange(0, 100)
-        self.volume_slider.setValue(50)
-        self.volume_slider.valueChanged.connect(self.set_volume)
 
         self.audio_output = QAudioOutput()
         self.media_player = QMediaPlayer()
@@ -305,10 +316,10 @@ class TTS(QMainWindow):
     def create_main_content(self):
         main_widget = QWidget()
         main_layout = QHBoxLayout(main_widget)
-        main_layout.setSpacing(40)  # Increased spacing between frames
-        main_layout.setContentsMargins(50, 50, 50, 50)  # Larger margins for better spacing
-        
-        # Enhanced Left Frame
+        main_layout.setSpacing(40)
+        main_layout.setContentsMargins(50, 50, 50, 50)
+
+        # Left Frame Setup
         left_frame = QFrame()
         left_frame.setStyleSheet("""
             QFrame {
@@ -318,7 +329,6 @@ class TTS(QMainWindow):
             }
         """)
         
-        # Add shadow effect to left frame
         shadow = QGraphicsDropShadowEffect()
         shadow.setBlurRadius(20)
         shadow.setColor(QColor(0, 0, 0, 30))
@@ -326,22 +336,20 @@ class TTS(QMainWindow):
         left_frame.setGraphicsEffect(shadow)
         
         left_layout = QVBoxLayout(left_frame)
-        left_layout.setContentsMargins(30, 30, 30, 30)  # Increased internal padding
-        left_layout.setSpacing(25)  # More spacing between elements
+        left_layout.setContentsMargins(30, 30, 30, 30)
+        left_layout.setSpacing(25)
 
-        # Improved Input Section
+        # Input Section
         input_label = QLabel("Text Input")
-        
         input_label.setStyleSheet("""
             font-size: 25px;
             font-weight: 700;
             color: #1a1a1a;
             margin-bottom: 15px;
             font-family: 'Segoe UI';
-            border:none;
+            border: none;
         """)
 
-        # Enhanced Text Input
         self.text_input = QTextEdit()
         self.text_input.setStyleSheet("""
             QTextEdit {
@@ -361,11 +369,194 @@ class TTS(QMainWindow):
         self.text_input.setMinimumHeight(200)
         self.text_input.setPlaceholderText("Enter your text here...")
 
-        # Improved Button Layout
+        # Right Frame Setup
+        right_frame = QFrame()
+        right_frame.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border-radius: 15px;
+                border: 1px solid #e0e0e0;
+            }
+        """)
+        
+        shadow2 = QGraphicsDropShadowEffect()
+        shadow2.setBlurRadius(20)
+        shadow2.setColor(QColor(0, 0, 0, 30))
+        shadow2.setOffset(0, 4)
+        right_frame.setGraphicsEffect(shadow2)
+
+        right_layout = QVBoxLayout(right_frame)
+        right_layout.setContentsMargins(30, 30, 30, 30)
+        right_layout.setSpacing(20)
+
+        # Video Section
+        video_label = QLabel("Video Output")
+        video_label.setStyleSheet("""
+            font-size: 25px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 10px;
+            font-family: 'Segoe UI';
+            border: none;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #eef2f7;
+        """)
+
+        # Video Controls
+        video_controls = QHBoxLayout()
+        video_controls.setSpacing(15)
+        video_controls.setContentsMargins(0, 0, 0, 15)
+
+        control_btn_style = """
+            QPushButton {
+                background-color: #2962ff;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 13px;
+                font-weight: 600;
+                font-family: 'Segoe UI';
+                min-width: 100px;
+                min-height: 38px;
+                padding: 8px 16px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            QPushButton:hover {
+                background-color: #1e88e5;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            }
+            QPushButton:pressed {
+                background-color: #1565c0;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+        """
+
+        self.play_pause_btn = QPushButton("Play")
+        self.mute_btn = QPushButton("Unmute")
+        
+        self.play_pause_btn.setStyleSheet(control_btn_style.replace("#2962ff", "#00c853"))
+        self.mute_btn.setStyleSheet(control_btn_style.replace("#2962ff", "#ff1744"))
+        
+        self.play_pause_btn.clicked.connect(self.toggle_play_pause)
+        self.mute_btn.clicked.connect(self.toggle_mute)
+        
+        video_controls.addWidget(self.play_pause_btn)
+        video_controls.addWidget(self.mute_btn)
+        video_controls.addStretch()
+
+        self.video_widget = QVideoWidget()
+        self.video_widget.setMinimumSize(450, 350)
+        self.video_widget.setStyleSheet("""
+            background-color: #f8fafc;
+            border-radius: 12px;
+            border: 2px solid #eef2f7;
+        """)
+        self.media_player.setVideoOutput(self.video_widget)
+
+         # Enhanced Speed Controls with better responsive design
+        speed_control_layout = QHBoxLayout()
+        speed_control_layout.setSpacing(20)
+        speed_control_layout.setContentsMargins(0, 15, 0, 15)
+
+        # Modern slider container frame
+        slider_frame = QFrame()
+        slider_frame.setStyleSheet("""
+            QFrame {
+                background-color: #f8fafc;
+                border-radius: 12px;
+                padding: 10px;
+                border: 1px solid #eef2f7;
+            }
+        """)
+        slider_layout = QHBoxLayout(slider_frame)
+        slider_layout.setContentsMargins(15, 5, 15, 5)
+        slider_layout.setSpacing(15)
+
+        # Enhanced slider styling
+        self.speed_slider = QSlider(Qt.Horizontal)
+        self.speed_slider.setMinimum(25)
+        self.speed_slider.setMaximum(200)
+        self.speed_slider.setValue(100)
+        self.speed_slider.setFixedWidth(250)  # Fixed width for consistency
+        self.speed_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: none;
+                height: 8px;
+                background: #e0e0e0;
+                border-radius: 4px;
+            }
+            QSlider::handle:horizontal {
+                background: #2962ff;
+                border: 3px solid #ffffff;
+                width: 22px;
+                height: 22px;
+                margin: -7px 0;
+                border-radius: 12px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            }
+            QSlider::handle:horizontal:hover {
+                background: #1e88e5;
+                border: 3px solid #f5f5f5;
+                box-shadow: 0 3px 7px rgba(0,0,0,0.3);
+            }
+            QSlider::sub-page:horizontal {
+                background: #2962ff;
+                border-radius: 4px;
+            }
+        """)
+
+        # In create_main_content, after creating the speed slider
+        self.speed_slider.valueChanged.connect(self.update_speed)
+
+
+        # Modern speed labels
+        speed_label_style = """
+            QLabel {
+                color: #424242;
+                font-size: 14px;
+                font-weight: 600;
+                font-family: 'Segoe UI';
+                padding: 5px 10px;
+                background: #ffffff;
+                border-radius: 8px;
+                border: 1px solid #eef2f7;
+            }
+        """
+
+        slow_label = QLabel("0.25x")
+        fast_label = QLabel("2.00x")
+        slow_label.setStyleSheet(speed_label_style)
+        fast_label.setStyleSheet(speed_label_style)
+
+        self.speed_label = QLabel("1.00x")
+        self.speed_label.setStyleSheet("""
+            QLabel {
+                color: #2962ff;
+                font-size: 14px;
+                font-weight: 600;
+                font-family: 'Segoe UI';
+                min-width: 70px;
+                padding: 5px 15px;
+                background: #ffffff;
+                border: 2px solid #2962ff;
+                border-radius: 8px;
+                text-align: center;
+            }
+        """)
+
+        # Assemble slider components
+        slider_layout.addWidget(slow_label)
+        slider_layout.addWidget(self.speed_slider)
+        slider_layout.addWidget(fast_label)
+        slider_layout.addWidget(self.speed_label)
+
+        speed_control_layout.addWidget(slider_frame)
+
+
+        # Action Buttons
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(20)
 
-        # Enhanced Button Styles
         button_style = """
             QPushButton {
                 background-color: #2962ff;
@@ -380,105 +571,6 @@ class TTS(QMainWindow):
             }
             QPushButton:hover {
                 background-color: #1e88e5;
-                margin-top: -1px;  /* Using margin instead of transform */
-            }
-            QPushButton:pressed {
-                background-color: #1565c0;
-                margin-top: 0px;
-            }
-        """
-
-        # Enhanced Right Frame
-        right_frame = QFrame()
-        right_frame.setStyleSheet("""
-            QFrame {
-                background-color: white;
-                border-radius: 15px;
-                border: 1px solid #e0e0e0;
-            }
-        """)
-        
-        # Add shadow effect to right frame
-        shadow2 = QGraphicsDropShadowEffect()
-        shadow2.setBlurRadius(20)
-        shadow2.setColor(QColor(0, 0, 0, 30))
-        shadow2.setOffset(0, 4)
-        right_frame.setGraphicsEffect(shadow2)
-
-        right_layout = QVBoxLayout(right_frame)
-        right_layout.setContentsMargins(30, 30, 30, 30)
-        right_layout.setSpacing(25)
-
-        video_label = QLabel("Video Output")
-        video_label.setFixedHeight(70)
-        video_label.setStyleSheet("""
-            font-size: 25px;
-            font-weight: 700;
-            color: #1a1a1a;
-            margin-bottom: 15px;
-            font-family: 'Segoe UI';
-            border:none;
-        """)
-
-        self.video_widget = QVideoWidget()
-        self.video_widget.setMinimumSize(450, 350)
-        self.video_widget.setStyleSheet("""
-            background-color: #f8fafc;
-            border-radius: 12px;
-            border: 2px solid #eef2f7;
-        """)
-        self.media_player.setVideoOutput(self.video_widget)
-
-        # Add loading spinner
-        self.init_animation_label = QLabel(self.video_widget)
-        self.init_animation_label.setAlignment(Qt.AlignCenter)
-        self.init_animation_label.setStyleSheet("""
-                QLabel {
-                    background-color: rgba(248, 250, 252, 0.9);
-                    border-radius: 12px;
-                    padding: 20px;
-                    font-size: 18px;
-                    font-weight: 600;
-                    color: #2962ff;
-                }
-            """)
-            
-            # Create animation text
-        self.animation_text = ["Initializing", "Initializing.", "Initializing..", "Initializing..."]
-        self.animation_index = 0
-            
-            # Setup animation timer
-        self.animation_timer = QTimer()
-        self.animation_timer.timeout.connect(self.update_animation)
-        self.animation_timer.start(500)  # Update every 500ms
-
-        # Add after the video_widget in create_main_content method
-        # Create video controls layout
-        video_controls = QHBoxLayout()
-        video_controls.setSpacing(10)
-        video_controls.addWidget(self.progress_slider)
-        video_controls.addWidget(self.volume_slider)
-
-        # Create control buttons with icons
-        self.play_pause_btn = QPushButton("Play")
-        self.mute_btn = QPushButton("Unmute")
-
-        # Style for control buttons
-        # In create_main_content method, update the control button style:
-        control_btn_style = """
-            QPushButton {
-                background-color: #2962ff;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                font-size: 14px;
-                font-weight: 600;
-                font-family: 'Segoe UI';
-                min-width: 80px;
-                min-height: 35px;
-            }
-            QPushButton:hover {
-                background-color: #1e88e5;
                 margin-top: -1px;
             }
             QPushButton:pressed {
@@ -487,34 +579,6 @@ class TTS(QMainWindow):
             }
         """
 
-        # Create video controls with different colors
-        self.play_pause_btn = QPushButton("Play")
-        self.mute_btn = QPushButton("Unmute")
-
-        # Set unique colors for each button
-        self.play_pause_btn.setStyleSheet(control_btn_style.replace("#2962ff", "#00c853"))  # Green for play/pause
-        self.mute_btn.setStyleSheet(control_btn_style.replace("#2962ff", "#ff1744"))        # Red for mute/unmute
-
-        # Add hover effects
-        video_controls.setSpacing(15)
-        self.play_pause_btn.setCursor(Qt.PointingHandCursor)
-        self.mute_btn.setCursor(Qt.PointingHandCursor)
-
-
-        # Add buttons to controls layout
-        video_controls.addWidget(self.play_pause_btn)
-        video_controls.addWidget(self.mute_btn)
-        video_controls.addStretch()
-
-        # Connect button signals
-        self.play_pause_btn.clicked.connect(self.toggle_play_pause)
-        self.mute_btn.clicked.connect(self.toggle_mute)
-
-        # Add video controls to right layout
-        right_layout.addLayout(video_controls)
-
-
-        # Create and style buttons
         buttons = [
             ("Send", "#2962ff"),
             ("Clear", "#ff1744"),
@@ -537,18 +601,23 @@ class TTS(QMainWindow):
             elif text == "Paste":
                 btn.clicked.connect(self.paste_text)
 
-        # Add widgets to layouts
+        # Assembling Layouts
         left_layout.addWidget(input_label)
         left_layout.addWidget(self.text_input)
         left_layout.addLayout(buttons_layout)
 
         right_layout.addWidget(video_label)
+        right_layout.addLayout(video_controls)
         right_layout.addWidget(self.video_widget)
+        right_layout.addLayout(speed_control_layout)
 
         main_layout.addWidget(left_frame, 1)
         main_layout.addWidget(right_frame, 1)
 
         self.main_layout.addWidget(main_widget)
+
+
+
 
     def toggle_play_pause(self):
         if self.media_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
@@ -565,6 +634,13 @@ class TTS(QMainWindow):
         else:
             self.audio_output.setMuted(True)
             self.mute_btn.setText("Unmute")
+
+        # Add this method to your class to handle slider value changes
+    def update_speed(self):
+            speed = self.speed_slider.value() / 100.0
+            self.speed_label.setText(f"{speed:.2f}x")
+            self.media_player.setPlaybackRate(speed)
+
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -649,15 +725,6 @@ class TTS(QMainWindow):
             self.animation_index = (self.animation_index + 1) % len(self.animation_text)
             self.init_animation_label.setText(self.animation_text[self.animation_index])
 
-    def seek_video(self, position):
-        if self.media_player.duration() > 0:
-            # Convert to integer using round() to avoid float errors
-            new_position = round((position / 100.0) * self.media_player.duration())
-            self.media_player.setPosition(new_position)
-
-            
-    def set_volume(self, volume):
-        self.audio_output.setVolume(volume / 100.0)
 
     def update_player_controls(self):
         # Update play/pause button text
@@ -673,25 +740,55 @@ class TTS(QMainWindow):
             self.mute_btn.setText("Mute")
             
         # Update volume slider
-        self.volume_slider.setValue(int(self.audio_output.volume() * 100))
+        
+
+    def set_playback_speed(self, speed):
+        self.media_player.setPlaybackRate(speed)
+
+    def speed_up(self):
+        current_speed = self.media_player.playbackRate()
+        new_speed = min(current_speed + 0.25, 2.0)  # Max speed 2x
+        self.set_playback_speed(new_speed)
+        self.speed_label.setText(f"{new_speed:.2f}x")
+
+    def slow_down(self):
+        current_speed = self.media_player.playbackRate()
+        new_speed = max(current_speed - 0.25, 0.25)  # Min speed 0.25x
+        self.set_playback_speed(new_speed)
+        self.speed_label.setText(f"{new_speed:.2f}x")
+
 
     def _process_text(self):
         try:
+            # Get and validate input text
             text = self.text_input.toPlainText()
             if not text.strip():
                 return
-                
+                    
+            # Reset playback state
             self.media_player.stop()
+            self.set_playback_speed(1.0)  # Reset speed to normal
+            self.speed_label.setText("1.00x")
+                
+            # Process text to sign language video
             output_path = text_to_sign(text, self.video_names, self.dataset_path)
-            
-            if output_path:
+                
+            # Play the generated video if successful
+            if output_path and os.path.exists(output_path):
                 video_url = QUrl.fromLocalFile(os.path.abspath(output_path))
                 self.media_player.setSource(video_url)
                 self.media_player.play()
+                self.play_pause_btn.setText("Pause")
                 self.update_player_controls()
+                
+        except Exception as e:
+            print(f"Video processing error: {str(e)}")
+            
         finally:
+            # Reset processing state
             self.is_processing = False
             self.hide_loading_animation()
+
 
 
 if __name__ == "__main__":
