@@ -5,6 +5,13 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QPixmap, QIcon, QColor, QPalette, QLinearGradient, QBrush, QFont
 import os
+from .alphabet_learning import AlphabetLearning
+from .days_learning import DaysLearning
+from .colors_learning import ColorsLearning
+from .numbers_learning import NumbersLearning
+from .months_learning import MonthsLearning
+from .greetings_learning import GreetingsLearning
+
 
 class LearningSection(QWidget):
     def __init__(self):
@@ -46,13 +53,14 @@ class LearningSection(QWidget):
         self.grid_layout.setContentsMargins(20, 20, 20, 20)
         
         # Define categories with local image paths
+        # Replace the categories list with:
         self.categories = [
-            ("Alphabets", "assets/asl_images/A.png", "Master ASL Alphabets A-Z", "#FF6B6B"),
-            ("Greetings", "assets/asl_images/A.png", "Learn Essential Greetings", "#4ECDC4"),
-            ("Numbers", "assets/asl_images/A.png", "Count in Sign Language", "#45B7D1"),
-            ("Days", "assets/asl_images/A.png", "Days and Time Expressions", "#96CEB4"),
-            ("Colors", "assets/asl_images/A.png", "Explore Colors in ASL", "#D4A5A5"),
-            ("Phrases", "assets/asl_images/A.png", "Common Daily Phrases", "#9B89B3")
+            ("Alphabets", "assets/cards_image/alphabet.jpg", "Master ASL Alphabets A-Z", "#FF6B6B"),
+            ("Greetings & Phrases", "assets/cards_image/greetings.jpg", "Learn Essential Expressions", "#4ECDC4"),
+            ("Numbers", "assets/cards_image/numbers.jpg", "Count in Sign Language", "#45B7D1"),
+            ("Days", "assets/cards_image/days.jpg", "Days and Time Expressions", "#96CEB4"),
+            ("Colors", "assets/cards_image/colours.jpg", "Explore Colors in ASL", "#D4A5A5"),
+            ("Months", "assets/cards_image/months.jpg", "Learn Monthly Calendar Signs", "#9B89B3")
         ]
         
         # Arrange cards in a grid
@@ -212,13 +220,69 @@ class LearningSection(QWidget):
             }}
         """)
         learn_btn.setCursor(Qt.PointingHandCursor)
-        learn_btn.clicked.connect(lambda: self.open_video_player(title))
+        # Replace it with:
+        if title == "Alphabets":
+            learn_btn.clicked.connect(self.open_alphabet_learning)
+        elif title == "Days":
+            learn_btn.clicked.connect(self.open_days_learning)
+
+        elif title == "Colors":
+            learn_btn.clicked.connect(self.open_colors_learning)
+
+        elif title == "Numbers":
+            learn_btn.clicked.connect(self.open_numbers_learning)
+
+        elif title == "Months":
+            learn_btn.clicked.connect(self.open_months_learning)
+
+        elif title == "Greetings & Phrases":
+            learn_btn.clicked.connect(self.open_greetings_learning)
+        else:
+            learn_btn.clicked.connect(lambda: self.open_video_player(title))
+
         layout.addWidget(learn_btn)
         
         return card
 
-    def open_video_player(self, category):
-        print(f"Opening videos for {category}")
+    def open_alphabet_learning(self):
+        from ui.alphabet_learning import AlphabetLearning
+        self.alphabet_section = AlphabetLearning()
+        # Get the main window's content area directly
+        main_window = self.window()
+        main_window.content_area.addWidget(self.alphabet_section)
+        main_window.content_area.setCurrentWidget(self.alphabet_section)
+
+    def open_days_learning(self):
+        self.days_section = DaysLearning()
+        main_window = self.window()
+        main_window.content_area.addWidget(self.days_section)
+        main_window.content_area.setCurrentWidget(self.days_section)
+
+    def open_colors_learning(self):
+        self.colors_section = ColorsLearning()
+        main_window = self.window()
+        main_window.content_area.addWidget(self.colors_section)
+        main_window.content_area.setCurrentWidget(self.colors_section)
+
+    def open_numbers_learning(self):
+        self.numbers_section = NumbersLearning()
+        main_window = self.window()
+        main_window.content_area.addWidget(self.numbers_section)
+        main_window.content_area.setCurrentWidget(self.numbers_section)
+
+    def open_months_learning(self):
+        self.months_section = MonthsLearning()
+        main_window = self.window()
+        main_window.content_area.addWidget(self.months_section)
+        main_window.content_area.setCurrentWidget(self.months_section)
+
+    def open_greetings_learning(self):
+        self.greetings_section = GreetingsLearning()
+        main_window = self.window()
+        main_window.content_area.addWidget(self.greetings_section)
+        main_window.content_area.setCurrentWidget(self.greetings_section)
+
+
 
     def load_local_image(self, image_label, image_path):
         if os.path.exists(image_path):
