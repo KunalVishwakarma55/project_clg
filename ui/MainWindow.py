@@ -64,8 +64,8 @@ class MainWindow(QWidget):
             ("Home", "assets/"),
             ("Sign to Text", "assets/"),
             ("Text to Sign", "assets/"),
-            ("ASL Lessons", "assets/"),
-            ("Learning", "assets/")  
+            ("ASL Test", "assets/"),
+            ("Lessons", "assets/")  
         ]
         self.nav_button_dict = {}
 

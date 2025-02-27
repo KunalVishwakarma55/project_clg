@@ -59,7 +59,7 @@ class LearningSection(QWidget):
             ("Greetings & Phrases", "assets/cards_image/greetings.jpg", "Learn Essential Expressions", "#4ECDC4"),
             ("Numbers", "assets/cards_image/numbers.jpg", "Count in Sign Language", "#45B7D1"),
             ("Days", "assets/cards_image/days.jpg", "Days and Time Expressions", "#96CEB4"),
-            ("Colors", "assets/cards_image/colours.jpg", "Explore Colors in ASL", "#D4A5A5"),
+            ("Colors", "assets/cards_image/colors.jpg", "Explore Colors in ASL", "#D4A5A5"),
             ("Months", "assets/cards_image/months.jpg", "Learn Monthly Calendar Signs", "#9B89B3")
         ]
         

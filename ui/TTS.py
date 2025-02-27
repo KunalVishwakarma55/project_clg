@@ -220,7 +220,7 @@ class TTS(QMainWindow):
 
         
         # Initialize dataset
-        self.dataset_path = "C:/Users/Ravi/Desktop/College_project/text-to-sign/Dataset/simplified_dataset"
+        self.dataset_path = "text-to-sign/Dataset/simplified_dataset"
         self.videos = os.listdir(self.dataset_path)
         self.video_names = [os.path.splitext(video)[0].replace('-', ' ').lower() for video in self.videos]
         
@@ -432,16 +432,16 @@ class TTS(QMainWindow):
         """
 
         self.play_pause_btn = QPushButton("Play")
-        self.mute_btn = QPushButton("Unmute")
+        # self.mute_btn = QPushButton("Unmute")
         
         self.play_pause_btn.setStyleSheet(control_btn_style.replace("#2962ff", "#00c853"))
-        self.mute_btn.setStyleSheet(control_btn_style.replace("#2962ff", "#ff1744"))
+        # self.mute_btn.setStyleSheet(control_btn_style.replace("#2962ff", "#ff1744"))
         
         self.play_pause_btn.clicked.connect(self.toggle_play_pause)
-        self.mute_btn.clicked.connect(self.toggle_mute)
+        # self.mute_btn.clicked.connect(self.toggle_mute)
         
         video_controls.addWidget(self.play_pause_btn)
-        video_controls.addWidget(self.mute_btn)
+        # video_controls.addWidget(self.mute_btn)
         video_controls.addStretch()
 
         self.video_widget = QVideoWidget()

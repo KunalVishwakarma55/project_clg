@@ -89,30 +89,18 @@ class NumbersLearning(QWidget):
         grid_layout.setSpacing(15)
 
         numbers_data = [
-            {"row": 0, "numbers": ["1 (ONE)", "2 (TWO)", "3 (THREE)", "4 (FOUR)", "5 (FIVE)"]},
-            {"row": 1, "numbers": ["6 (SIX)", "7 (SEVEN)", "8 (EIGHT)", "9 (NINE)"]}
+            {"row": 0, "numbers": ["0 (ZERO)", "1 (ONE)", "2 (TWO)", "3 (THREE)", "4 (FOUR)"]},
+            {"row": 1, "numbers": ["5 (FIVE)", "6 (SIX)", "7 (SEVEN)", "8 (EIGHT)", "9 (NINE)"]}
         ]
 
-        # Add buttons for each row
         for row_data in numbers_data:
             row = row_data["row"]
             numbers = row_data["numbers"]
             
-            if row == 0:
-                # First row: Each button spans 2 columns
-                for i, number in enumerate(numbers):
-                    button = self.create_number_button(number)
-                    grid_layout.addWidget(button, row, i * 2, 1, 2)
-            else:
-                # Second row: Start from column 1, each button spans 2 columns
-                start_col = 1  # Start from second column to center
-                for i, number in enumerate(numbers):
-                    button = self.create_number_button(number)
-                    grid_layout.addWidget(button, row, start_col + (i * 2), 1, 2)
+            for col, number in enumerate(numbers):
+                button = self.create_number_button(number)
+                grid_layout.addWidget(button, row, col)
 
-        # Set equal column stretches for 10 columns
-        for i in range(10):
-            grid_layout.setColumnStretch(i, 1)
         main_layout.addWidget(grid_frame)
 
     def create_number_button(self, number):
