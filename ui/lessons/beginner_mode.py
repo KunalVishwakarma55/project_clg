@@ -351,7 +351,21 @@ class BeginnerMode(QWidget):
         main_layout.addWidget(left_frame, 1)
         main_layout.addWidget(right_frame, 1)
 
+
+    def setup_sounds(self):
+        self.correct_sound = QSoundEffect()
+        self.correct_sound.setSource(QUrl.fromLocalFile("assets/sounds/correct.wav"))
+        self.wrong_sound = QSoundEffect()
+        self.wrong_sound.setSource(QUrl.fromLocalFile("assets/sounds/wrong.wav"))
+
     def load_new_question(self):
+       # Try to get main window through parent hierarchy
+        try:
+            main_window = self.window()
+            if hasattr(main_window, 'navbar'):
+                main_window.navbar.setEnabled(False)
+        except:
+            pass
         self.start_timer()
         self.current_letter = random.choice(self.letters)
         image_path = f"assets/asl_images/{self.current_letter.lower()}.png"
@@ -367,12 +381,6 @@ class BeginnerMode(QWidget):
         random.shuffle(choices)
         for btn, choice in zip(self.choice_buttons, choices):
             btn.setText(choice)
-
-    def setup_sounds(self):
-        self.correct_sound = QSoundEffect()
-        self.correct_sound.setSource(QUrl.fromLocalFile("assets/sounds/correct.wav"))
-        self.wrong_sound = QSoundEffect()
-        self.wrong_sound.setSource(QUrl.fromLocalFile("assets/sounds/wrong.wav"))
 
     def check_answer(self, selected_letter):
         self.timer.stop()
@@ -397,7 +405,7 @@ class BeginnerMode(QWidget):
         self.score += 10 + bonus_points
         
         # Update UI elements
-        self.score_label.setText(f"Score: {self.score} ✨")
+        self.score_label.setText(f"Score: {self.score} 💎")
         self.streak_label.setText(f"Streak: {self.current_streak} 🔥")
         self.best_streak_label.setText(f"Best: {self.best_streak} ⭐")
         self.bonus_label.setText(f"+{bonus_points} Time Bonus!")
@@ -536,40 +544,104 @@ class BeginnerMode(QWidget):
         self.level_label.setText(f"Level: {level}")
         QTimer.singleShot(2000, level_label.deleteLater)
     def show_statistics(self):
-        stats_window = QLabel(self)
-        accuracy = (self.stats['correct_answers'] / max(1, self.stats['total_attempts'])) * 100
-        
-        stats_text = f"""
-            📊 Performance Statistics:
-            
-            Total Attempts: {self.stats['total_attempts']}
-            Correct Answers: {self.stats['correct_answers']}
-            Accuracy: {accuracy:.1f}%
-            Average Response Time: {self.stats['average_time']:.1f}s
-            Best Response Time: {self.stats['best_time']:.1f}s
-            Best Streak: {self.best_streak}
-            Current Score: {self.score}
-        """
-        
-        stats_window.setText(stats_text)
-        stats_window.setStyleSheet("""
-            QLabel {
-                background-color: white;
-                padding: 20px;
-                border: 2px solid #3498db;
-                border-radius: 15px;
-                font-size: 18px;
-                color: #2c3e50;
-                font-weight: bold;
+        """Display performance statistics with enhanced UI."""
+        # Hide the image label temporarily
+        self.image_label.hide()
+
+        # Create a semi-transparent overlay
+        self.overlay = QFrame(self)
+        self.overlay.setStyleSheet("""
+            QFrame {
+                background-color: rgba(0, 0, 0, 0.7);
             }
         """)
-        stats_window.adjustSize()
-        stats_window.move(
-            self.width()//2 - stats_window.width()//2,
-            self.height()//2 - stats_window.height()//2
-        )
-        stats_window.show()
-        QTimer.singleShot(5000, stats_window.deleteLater)
+        self.overlay.setGeometry(self.rect())
+
+        # Create stats container with animation
+        stats_container = QFrame(self.overlay)
+        stats_container.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border: 3px solid #3498db;
+                border-radius: 20px;
+                padding: 25px;
+            }
+        """)
+
+        stats_layout = QVBoxLayout(stats_container)
+
+        # Add stats content
+        title = QLabel("🏆 Performance Dashboard")
+        title.setStyleSheet("""
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+        """)
+        stats_layout.addWidget(title, alignment=Qt.AlignCenter)
+
+        # Calculate accuracy
+        accuracy = (self.stats['correct_answers'] / max(1, self.stats['total_attempts'])) * 100
+
+        stats_text = f"""
+            🎯 Total Attempts: {self.stats['total_attempts']}
+            ✅ Correct Answers: {self.stats['correct_answers']}
+            📊 Accuracy: {accuracy:.1f}%
+            ⏱️ Average Response: {self.stats['average_time']:.1f}s
+            🚀 Best Response: {self.stats['best_time']:.1f}s
+            🔥 Best Streak: {self.best_streak}
+            💫 Current Score: {self.score}
+        """
+        stats_content = QLabel(stats_text)
+        stats_content.setStyleSheet("""
+            font-size: 20px;
+            color: #2c3e50;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            margin: 10px;
+        """)
+        stats_layout.addWidget(stats_content, alignment=Qt.AlignCenter)
+
+        # Close button with hover effect
+        close_btn = QPushButton("Close Dashboard")
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3498db;
+                color: white;
+                padding: 12px 25px;
+                border-radius: 12px;
+                font-size: 18px;
+                font-weight: bold;
+                min-width: 150px;
+            }
+            QPushButton:hover {
+                background-color: #2980b9;
+                transform: scale(1.05);
+            }
+        """)
+        close_btn.clicked.connect(self.close_statistics)
+        stats_layout.addWidget(close_btn, alignment=Qt.AlignCenter)
+
+        # Center the container
+        overlay_layout = QVBoxLayout(self.overlay)
+        overlay_layout.addWidget(stats_container, alignment=Qt.AlignCenter)
+
+        # Show with fade-in effect
+        self.overlay.show()
+        stats_container.raise_()
+
+    def close_statistics(self):
+        """Close the statistics overlay."""
+        if hasattr(self, 'overlay') and self.overlay:
+            self.overlay.hide()
+            self.overlay.deleteLater()
+            del self.overlay
+
+        # Show the image label again
+        self.image_label.show()
 
     def show_emoji_animation(self, emoji_label):
         emoji_label.setAlignment(Qt.AlignCenter)
@@ -607,6 +679,112 @@ class BeginnerMode(QWidget):
         self.load_new_question()
         self.start_timer()
 
+    def show_exit_confirmation(self):
+        # Create overlay frame
+        overlay = QFrame(self)
+        overlay.setStyleSheet("""
+            QFrame {
+                background-color: rgba(0, 0, 0, 0.7);
+            }
+        """)
+        overlay.setGeometry(self.rect())
+        
+        # Create confirmation dialog
+        dialog = QFrame(overlay)
+        dialog.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border: 2px solid #e74c3c;
+                border-radius: 15px;
+                padding: 20px;
+            }
+        """)
+        
+        dialog_layout = QVBoxLayout(dialog)
+        
+        # Warning message
+        warning = QLabel("⚠️ Exit Test")
+        warning.setStyleSheet("""
+            font-size: 24px;
+            color: #e74c3c;
+            font-weight: bold;
+        """)
+        
+        message = QLabel("Are you sure you want to exit?\nYour test progress will be reset.")
+        message.setStyleSheet("""
+            font-size: 18px; 
+            padding: 10px;
+            color: #2c3e50;
+            text-align: center;
+        """)
+        message.setAlignment(Qt.AlignCenter)
+        
+        # Buttons
+        buttons = QHBoxLayout()
+        continue_btn = QPushButton("Continue Test")
+        exit_btn = QPushButton("Exit Test")
+        
+        continue_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2ecc71;
+                color: white;
+                border-radius: 8px;
+                padding: 10px 20px;
+                font-weight: bold;
+            }
+        """)
+        
+        exit_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #e74c3c;
+                color: white;
+                border-radius: 8px;
+                padding: 10px 20px;
+                font-weight: bold;
+            }
+        """)
+        
+        buttons.addWidget(continue_btn)
+        buttons.addWidget(exit_btn)
+        
+        dialog_layout.addWidget(warning, alignment=Qt.AlignCenter)
+        dialog_layout.addWidget(message, alignment=Qt.AlignCenter)
+        dialog_layout.addLayout(buttons)
+        
+        # Center the dialog
+        overlay_layout = QVBoxLayout(overlay)
+        overlay_layout.addWidget(dialog, alignment=Qt.AlignCenter)
+        
+        overlay.show()
+        
+        # Connect buttons
+        continue_btn.clicked.connect(overlay.deleteLater)
+        exit_btn.clicked.connect(lambda: self.confirm_exit(overlay))
+
+    # Add method to reset test
+    def reset_test(self):
+        self.score = 0
+        self.current_streak = 0
+        self.best_streak = 0
+        self.time_remaining = 30
+        self.timer.stop()
+        self.progress_bar.setValue(0)
+        self.stats = {
+            'total_attempts': 0,
+            'correct_answers': 0,
+            'average_time': 0,
+            'best_time': float('inf')
+        }
+        
+        # Reset UI elements
+        self.score_label.setText("Score: 0")
+        self.streak_label.setText("Streak: 0 🔥")
+        self.best_streak_label.setText("Best: 0 ⭐")
+        self.progress_bar.setFormat("Progress: 0/26 Letters")
+        self.timer_label.setText("Time: 30s")
+        self.bonus_label.clear()
+
+
     def reset_buttons_and_load_new(self):
         for btn in self.choice_buttons:
             btn.setStyleSheet("""
@@ -627,9 +805,20 @@ class BeginnerMode(QWidget):
         self.bonus_label.clear()
         self.load_new_question()
 
-    def go_back_to_modes(self):
-        self.timer.stop()
+    def confirm_exit(self, overlay):
+        try:
+            main_window = self.window()
+            if hasattr(main_window, 'navbar'):
+                main_window.navbar.setEnabled(True)
+        except:
+            pass
+        self.reset_test()
+        overlay.deleteLater()
         self.parent().setCurrentIndex(0)
+
+    def go_back_to_modes(self):
+        self.show_exit_confirmation()
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = BeginnerMode()

@@ -5,7 +5,7 @@ from PySide6.QtGui import QFont ,QPixmap , QIcon
 from ui.Home import Home 
 from ui.STT import STT
 from ui.TTS import TTS
-from ui.lesson_ui import LessonUI
+from ui.lesson_ui import QuizUI
 from ui.learning import LearningSection
 class MainWindow(QWidget):
     def __init__(self):
@@ -34,7 +34,7 @@ class MainWindow(QWidget):
         self.home = Home()
         self.STT = STT()
         self.TTS = TTS()
-        self.lesson = LessonUI()
+        self.lesson = QuizUI()
         self.learning = LearningSection()
 
         # Add tabs to stacked widget
@@ -112,9 +112,15 @@ class MainWindow(QWidget):
 
 
     def switch_tab(self, index, active_style, inactive_style):
+        current_widget = self.content_area.currentWidget()
+        
+        # If we're in a test (navbar disabled), don't allow switching
+        if not self.navbar.isEnabled():
+            return
+            
         # Switch the current tab
         self.content_area.setCurrentIndex(index)
-
+        
         # Update styles for all buttons
         for text, button in self.nav_button_dict.items():
             if self.content_area.currentIndex() == list(self.nav_button_dict.keys()).index(text):

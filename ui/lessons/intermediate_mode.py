@@ -3,6 +3,7 @@ import random
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame
 )
+from PySide6.QtCore import Signal  # Add this import
 from PySide6.QtMultimediaWidgets import QVideoWidget
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput, QSoundEffect
 from PySide6.QtCore import Qt, QTimer, QUrl, QPropertyAnimation, QEasingCurve, QPoint
@@ -11,6 +12,7 @@ from PySide6.QtWidgets import QSizePolicy
 from PySide6.QtCore import QSize
 
 class IntermediateMode(QWidget):
+    stats_updated = Signal(dict)
     def __init__(self):
         super().__init__()
         self.score = 0
@@ -598,12 +600,26 @@ class IntermediateMode(QWidget):
 
 
     def show_statistics(self):
-        """Display performance statistics with enhanced UI."""
+        """Display performance statistics with enhanced UI and emit them to the Dashboard."""
         # Hide the video widget
         self.video_widget.hide()
 
         # Calculate accuracy
         accuracy = (self.stats['correct_answers'] / max(1, self.stats['total_attempts'])) * 100
+
+        # Prepare the statistics dictionary
+        stats = {
+            'total_attempts': self.stats['total_attempts'],
+            'correct_answers': self.stats['correct_answers'],
+            'accuracy': accuracy,
+            'average_time': self.stats['average_time'],
+            'best_time': self.stats['best_time'],
+            'best_streak': self.best_streak,
+            'current_score': self.score
+        }
+
+        # Emit the statistics to the Dashboard
+        self.stats_updated.emit(stats)
 
         # Create a semi-transparent overlay
         self.overlay = QFrame(self)  # Store overlay as an instance variable
@@ -640,13 +656,13 @@ class IntermediateMode(QWidget):
         stats_layout.addWidget(title, alignment=Qt.AlignCenter)
 
         stats_text = f"""
-            🎯 Total Attempts: {self.stats['total_attempts']}
-            ✅ Correct Answers: {self.stats['correct_answers']}
-            📊 Accuracy: {accuracy:.1f}%
-            ⏱️ Average Response: {self.stats['average_time']:.1f}s
-            🚀 Best Response: {self.stats['best_time']:.1f}s
-            🔥 Best Streak: {self.best_streak}
-            💫 Current Score: {self.score}
+            🎯 Total Attempts: {stats['total_attempts']}
+            ✅ Correct Answers: {stats['correct_answers']}
+            📊 Accuracy: {stats['accuracy']:.1f}%
+            ⏱️ Average Response: {stats['average_time']:.1f}s
+            🚀 Best Response: {stats['best_time']:.1f}s
+            🔥 Best Streak: {stats['best_streak']}
+            💫 Current Score: {stats['current_score']}
         """
         stats_content = QLabel(stats_text)
         stats_content.setStyleSheet("""
@@ -835,22 +851,76 @@ class IntermediateMode(QWidget):
             btn.clicked.connect(lambda checked, text=choice: self.check_answer(text))
 
     def handle_media_error(self, error, error_string):
-        """Handle media player errors"""
+        """Handle media player errors with an overlay message"""
         print(f"Media Error {error}: {error_string}")
-        error_label = QLabel(f"Error playing video: {error_string}", self)
-        error_label.setStyleSheet("""
-            background-color: #e74c3c;
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
+        
+        # Create an overlay frame
+        error_overlay = QFrame(self)
+        error_overlay.setStyleSheet("""
+            QFrame {
+                background-color: rgba(0, 0, 0, 0.7);
+            }
         """)
-        error_label.adjustSize()
-        error_label.move(
-            self.width() // 2 - error_label.width() // 2,
-            self.height() // 2 - error_label.height() // 2
-        )
-        error_label.show()
-        QTimer.singleShot(3000, error_label.deleteLater)
+        error_overlay.setGeometry(self.rect())
+        
+        # Create error message container
+        error_container = QFrame(error_overlay)
+        error_container.setStyleSheet("""
+            QFrame {
+                background-color: #e74c3c;
+                border-radius: 10px;
+                padding: 20px;
+                margin: 20px;
+            }
+        """)
+        
+        # Create error message
+        error_label = QLabel(f"Error playing video:\n{error_string}")
+        error_label.setStyleSheet("""
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+        """)
+        error_label.setAlignment(Qt.AlignCenter)
+        
+        # Create retry button
+        retry_button = QPushButton("Retry")
+        retry_button.setStyleSheet("""
+            QPushButton {
+                background-color: white;
+                color: #e74c3c;
+                padding: 8px 20px;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #f5f5f5;
+            }
+        """)
+        
+        # Layout for error container
+        container_layout = QVBoxLayout(error_container)
+        container_layout.addWidget(error_label)
+        container_layout.addWidget(retry_button, alignment=Qt.AlignCenter)
+        
+        # Layout for overlay
+        overlay_layout = QVBoxLayout(error_overlay)
+        overlay_layout.addWidget(error_container, alignment=Qt.AlignCenter)
+        
+        # Show the overlay
+        error_overlay.raise_()  # Ensure overlay is on top
+        error_overlay.show()
+        
+        # Connect retry button
+        retry_button.clicked.connect(lambda: self.handle_retry(error_overlay))
+        
+        # Auto-hide after 5 seconds if not clicked
+        QTimer.singleShot(5000, lambda: self.handle_retry(error_overlay))
+    
+    def handle_retry(self, error_overlay):
+        """Handle retry attempt after error"""
+        error_overlay.deleteLater()
+        self.load_new_gesture()  # Try loading a new gesture
 
     def check_answer(self, selected_gesture):
         """Handle answer selection"""
@@ -869,6 +939,13 @@ class IntermediateMode(QWidget):
 
     def start_session(self):
         """Start the learning session"""
+        try:
+            main_window = self.window()
+            if hasattr(main_window, 'navbar'):
+                main_window.navbar.setEnabled(False)
+        except:
+            pass
+            
         self.start_button.hide()
         self.video_widget.show()
         self.play_button.show()
@@ -880,6 +957,7 @@ class IntermediateMode(QWidget):
             
         self.load_new_gesture()
         self.start_timer()
+
     def proceed_to_next(self):
         """Load next gesture after feedback"""
         for btn in self.choice_buttons:
@@ -919,7 +997,7 @@ class IntermediateMode(QWidget):
         
         
         # Update UI
-        self.score_label.setText(f"Score: {self.score} ✨")
+        self.score_label.setText(f"Score: {self.score} 💎")
         self.streak_label.setText(f"Streak: {self.current_streak} 🔥")
         self.best_streak_label.setText(f"Best: {self.best_streak} ⭐")
         
@@ -990,11 +1068,195 @@ class IntermediateMode(QWidget):
                     }
                 """)
 
+
+    def show_exit_confirmation(self):
+        """Display exit confirmation with enhanced UI matching statistics style."""
+        # Hide the video widget
+        self.video_widget.hide()
+
+        # Create a semi-transparent overlay
+        self.exit_overlay = QFrame(self)
+        self.exit_overlay.setStyleSheet("background-color: rgba(0, 0, 0, 0.7);")
+        self.exit_overlay.setGeometry(self.rect())
+
+        # Create exit confirmation container
+        exit_container = QFrame(self.exit_overlay)
+        exit_container.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border: 3px solid #3498db;
+                border-radius: 20px;
+                padding: 25px;
+            }
+        """)
+
+        exit_layout = QVBoxLayout(exit_container)
+
+        # Add title
+        title = QLabel("⚠️ Exit Confirmation")
+        title.setStyleSheet("""
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+        """)
+        exit_layout.addWidget(title, alignment=Qt.AlignCenter)
+
+        # Add message
+        message = QLabel("Are you sure you want to exit?\nYour test progress will be reset.")
+        message.setStyleSheet("""
+            font-size: 20px;
+            color: #2c3e50;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            margin: 10px;
+        """)
+        message.setAlignment(Qt.AlignCenter)
+        exit_layout.addWidget(message, alignment=Qt.AlignCenter)
+
+        # Button container
+        button_container = QFrame()
+        button_container.setStyleSheet("""
+            QFrame {
+                background-color: transparent;
+                border: none;
+            }
+        """)
+        button_layout = QHBoxLayout(button_container)
+
+        # Continue button
+        continue_btn = QPushButton("Continue Test")
+        continue_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3498db;
+                color: white;
+                padding: 12px 25px;
+                border-radius: 12px;
+                font-size: 18px;
+                font-weight: bold;
+                min-width: 150px;
+            }
+            QPushButton:hover {
+                background-color: #2980b9;
+                transform: scale(1.05);
+            }
+        """)
+
+        # Exit button
+        exit_btn = QPushButton("Exit Test")
+        exit_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #e74c3c;
+                color: white;
+                padding: 12px 25px;
+                border-radius: 12px;
+                font-size: 18px;
+                font-weight: bold;
+                min-width: 150px;
+            }
+            QPushButton:hover {
+                background-color: #c0392b;
+                transform: scale(1.05);
+            }
+        """)
+
+        button_layout.addWidget(continue_btn)
+        button_layout.addWidget(exit_btn)
+        exit_layout.addWidget(button_container, alignment=Qt.AlignCenter)
+
+        # Center the container within the overlay
+        overlay_layout = QVBoxLayout(self.exit_overlay)
+        overlay_layout.addWidget(exit_container, alignment=Qt.AlignCenter)
+
+        # Show with fade-in effect
+        self.exit_overlay.show()
+        exit_container.raise_()
+
+        # Connect buttons
+        continue_btn.clicked.connect(lambda: (
+            self.exit_overlay.deleteLater(),
+            self.video_widget.show()
+        ))
+        exit_btn.clicked.connect(lambda: self.confirm_exit(self.exit_overlay))
+
+    def confirm_exit(self, overlay):
+        try:
+            main_window = self.window()
+            if hasattr(main_window, 'navbar'):
+                main_window.navbar.setEnabled(True)
+        except:
+            pass
+        self.reset_test()
+        overlay.deleteLater()
+        self.parent().setCurrentIndex(0)
+
+    def reset_test(self):
+        """Reset all test parameters and UI elements"""
+        # Reset scores and timers
+        self.score = 0
+        self.current_streak = 0
+        self.best_streak = 0
+        self.time_remaining = 45
+        self.timer.stop()
+        self.media_player.stop()
+        
+        # Reset UI elements
+        self.score_label.setText("Score: 0")
+        self.streak_label.setText("Streak: 0 🔥")
+        self.best_streak_label.setText("Best: 0 ⭐")
+        self.timer_label.setText("Time: 45s")
+        
+        # Reset video elements visibility
+        self.video_widget.hide()
+        self.play_button.hide()
+        self.replay_button.hide()
+        self.hint_button.hide()
+        
+        # Show start button
+        self.start_button.show()
+        self.start_button.setEnabled(True)
+        
+        # Reset choice buttons
+        for btn in self.choice_buttons:
+            btn.setEnabled(False)
+            btn.setText("")
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #3498db;
+                    color: white;
+                    border-radius: 15px;
+                    font-size: 20px;
+                    font-weight: bold;
+                    margin: 8px;
+                }
+                QPushButton:hover {
+                    background-color: #2980b9;
+                }
+            """)
+        
+        # Reset practice mode
+        self.practice_mode = False
+        self.practice_mode_btn.setChecked(False)
+        
+        # Reset bonus multiplier
+        self.reset_bonus()
+        
+        # Reset statistics
+        self.stats = {
+            'total_attempts': 0,
+            'correct_answers': 0,
+            'average_time': 0,
+            'best_time': float('inf')
+        }
+
+
     def go_back_to_modes(self):
-        """Go back to the modes screen."""
         self.media_player.stop()
         self.timer.stop()
-        self.parent().setCurrentIndex(0)
+        self.show_exit_confirmation()
 
     def __del__(self):
         """Clean up resources"""

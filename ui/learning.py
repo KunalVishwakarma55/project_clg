@@ -55,12 +55,12 @@ class LearningSection(QWidget):
         # Define categories with local image paths
         # Replace the categories list with:
         self.categories = [
-            ("Alphabets", "assets/cards_image/alphabet.jpg", "Master ASL Alphabets A-Z", "#FF6B6B"),
-            ("Greetings & Phrases", "assets/cards_image/greetings.jpg", "Learn Essential Expressions", "#4ECDC4"),
-            ("Numbers", "assets/cards_image/numbers.jpg", "Count in Sign Language", "#45B7D1"),
-            ("Days", "assets/cards_image/days.jpg", "Days and Time Expressions", "#96CEB4"),
-            ("Colors", "assets/cards_image/colours.jpeg", "Explore Colors in ASL", "#D4A5A5"),
-            ("Months", "assets/cards_image/month.jpeg", "Learn Monthly Calendar Signs", "#9B89B3")
+            ("", "assets/cards_image/alphabet.jpg", "", "#FF6B6B"),
+            ("", "assets/cards_image/greetings.jpg", "", "#4ECDC4"), 
+            ("", "assets/cards_image/numbers.jpg", "", "#45B7D1"),
+            ("", "assets/cards_image/days.jpg", "", "#96CEB4"),
+            ("", "assets/cards_image/colours.jpeg", "", "#D4A5A5"),
+            ("", "assets/cards_image/month.jpg", "", "#9B89B3")
         ]
         
         # Arrange cards in a grid
@@ -124,7 +124,7 @@ class LearningSection(QWidget):
 
     def create_category_card(self, title, image_path, description, color):
         card = QFrame()
-        card.setFixedSize(450, 550)  # Increased from 400x500 to 450x550
+        card.setFixedSize(450, 550)
         card.setStyleSheet(f"""
             QFrame {{
                 background-color: white;
@@ -139,12 +139,11 @@ class LearningSection(QWidget):
             }}
         """)
 
-        
         layout = QVBoxLayout(card)
-        layout.setSpacing(0)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(5)  # Add spacing between elements
+        layout.setContentsMargins(0, 0, 0, 5)  # Add bottom margin
         
-        # Image container with gradient overlay
+        # Image container
         image_container = QFrame()
         image_container.setStyleSheet(f"""
             background-color: {color};
@@ -160,82 +159,62 @@ class LearningSection(QWidget):
         self.load_local_image(image, image_path)
         image_layout.addWidget(image)
         
-        # Gradient overlay for text readability
-        overlay = QFrame()
-        overlay.setStyleSheet("""
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                stop:0 rgba(0, 0, 0, 0), 
-                stop:1 rgba(0, 0, 0, 0.7));
-            border-radius: 20px 20px 0 0;
-        """)
-        overlay_layout = QVBoxLayout(overlay)
-        overlay_layout.setSpacing(10)
-        overlay_layout.setContentsMargins(20, 20, 20, 20)
-        
-        # Title
-        title_label = QLabel(title)
-        title_label.setStyleSheet("""
-            font-size: 28px;
-            font-weight: bold;
-            color: white;
-        """)
-        title_label.setAlignment(Qt.AlignCenter)
-        overlay_layout.addWidget(title_label)
-        
-        # Description
-        desc_label = QLabel(description)
-        desc_label.setStyleSheet("""
-            font-size: 18px;
-            color: #e0e0e0;
-        """)
-        desc_label.setAlignment(Qt.AlignCenter)
-        desc_label.setWordWrap(True)
-        overlay_layout.addWidget(desc_label)
-        
-        image_layout.addWidget(overlay)
         layout.addWidget(image_container)
         
-        # Start Learning Button
         learn_btn = QPushButton("Start Learning")
-        learn_btn.setIcon(QIcon("assets/play_icon.png"))
-        learn_btn.setIconSize(QSize(24, 24))
+        learn_btn.setIcon(QIcon("assets/play_icon.png"))  # Add play icon
+        learn_btn.setFixedSize(450, 60)  # Match card width
+        learn_btn.setIconSize(QSize(24, 24))  # Icon size
+
+        button_color = ""
+        if "alphabet" in image_path:
+            button_color = "#FF7777"  # Salmon Red
+        elif "greetings" in image_path:
+            button_color = "#4DC5C9"  # Cyan Blue
+        elif "numbers" in image_path:
+            button_color = "#3FACD0"  # Sky Blue
+        elif "days" in image_path:
+            button_color = "#A2C6C1"  # Soft Teal
+        elif "colours" in image_path:
+            button_color = "#CBAEA9"  # Muted Rose
+        elif "month" in image_path:
+            button_color = "#927CA3"  # Dusty Purple
         learn_btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: {color};
+                background-color: {button_color};
                 color: white;
-                padding: 15px 25px;
-                border-radius: 15px;
-                font-size: 18px;
                 font-weight: bold;
-                border: none;
+                font-size: 16px;
+                border-radius: 30px;
+                padding: 10px 20px;
                 text-align: center;
+                border: none;
+                box-shadow: 0 3px 6px rgba(0,0,0,0.16);
             }}
             QPushButton:hover {{
-                background-color: #333;
-                transform: translateY(-2px);
+                background-color: {button_color}dd;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.22);
             }}
             QPushButton:pressed {{
-                background-color: #222;
-                transform: translateY(0);
+                background-color: {button_color}ee;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.12);
             }}
         """)
         learn_btn.setCursor(Qt.PointingHandCursor)
-        # Replace it with:
-        if title == "Alphabets":
+            
+
+        # Button connections based on image path
+        if "alphabet" in image_path:
             learn_btn.clicked.connect(self.open_alphabet_learning)
-        elif title == "Days":
+        elif "days" in image_path:
             learn_btn.clicked.connect(self.open_days_learning)
-
-        elif title == "Colors":
+        elif "colours" in image_path:
             learn_btn.clicked.connect(self.open_colors_learning)
-
-        elif title == "Numbers":
+        elif "numbers" in image_path:
             learn_btn.clicked.connect(self.open_numbers_learning)
-
-        elif title == "Months":
+        elif "month" in image_path:
             learn_btn.clicked.connect(self.open_months_learning)
-
-        elif title == "Greetings & Phrases":
+        elif "greetings" in image_path:
             learn_btn.clicked.connect(self.open_greetings_learning)
         else:
             learn_btn.clicked.connect(lambda: self.open_video_player(title))

@@ -18,12 +18,9 @@ from PySide6.QtWidgets import (
     QGraphicsDropShadowEffect, QSlider
 )
 from PySide6.QtCore import Qt, QUrl, QTimer
-from PySide6.QtGui import QFont, QPixmap, QColor
+from PySide6.QtGui import QFont, QPixmap, QColor, QMovie
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
-from ui.loading_spinner import LoadingSpinner
-
-
 
 # Initialize NLTK components
 nltk.download('punkt')
@@ -99,9 +96,6 @@ def parse_string(string, dataset):
             i += 1
     
     return result
-
-
-
 
 def remove_empty_values(lst):
     return [x for x in lst if x]
@@ -184,10 +178,7 @@ def text_to_sign(text: str, dataset: List[str], videos_path: str) -> Optional[st
         if 'final_clip' in locals():
             final_clip.close()
 
-
-
 class TTS(QMainWindow):
-    # In the MainWindow class, add text_input_style before setup_ui()
     def __init__(self):
         super().__init__()
 
@@ -203,11 +194,54 @@ class TTS(QMainWindow):
 
         self.audio_output = QAudioOutput()
         self.media_player = QMediaPlayer()
-        self.loading_spinner = LoadingSpinner(self)
-        self.loading_spinner.setMinimumSize(100, 100)
+
+        self.video_widget = QVideoWidget()
+        self.video_widget.setMinimumSize(450, 350)
+        self.video_widget.setStyleSheet("""
+            background-color: white;
+            border-radius: 12px;
+            border: 2px solid #eef2f7;
+        """)
+        self.media_player.mediaStatusChanged.connect(self.handle_media_status)
+        
+        # Initialize loading spinner with a light color
+        self.loading_spinner = QLabel(self)
+        gif_path = os.path.abspath("assets/loa.svg")
+        self.loading_movie = QMovie(gif_path)
+        
+        # Debugging: Check if the GIF is loaded successfully
+        if not self.loading_movie.isValid():
+            print(f"Error: GIF file not found or invalid at path: {gif_path}")
+        else:
+            print("GIF loaded successfully")
+
+        self.loading_spinner.setMovie(self.loading_movie)
+        self.loading_movie.start()
+
+        if self.loading_movie.state() == QMovie.Running:
+            print("GIF is playing")
+        else:
+            print("GIF is not playing")
+
+        self.loading_spinner.setMovie(self.loading_movie)
+        self.loading_spinner.setFixedSize(200, 200)
+        self.loading_spinner.setStyleSheet("background-color: transparent;")
         self.loading_spinner.hide()
 
-        self.animation_text = ["Processing", "Processing ⚫", "Processing ⚫⚫", "Processing ⚫⚫⚫"]
+        self.is_loading = False
+
+    # Add a timer to delay hiding the loading animation
+        self.hide_animation_timer = QTimer()
+        self.hide_animation_timer.setSingleShot(True)  # Only trigger once
+        self.hide_animation_timer.timeout.connect(self.hide_loading_animation)
+        
+        # Animation text for loading
+        self.animation_label = QLabel(self)
+        self.animation_label.setAlignment(Qt.AlignCenter)
+        self.animation_label.setStyleSheet("color: white; font-size: 16px; background-color: rgba(0, 0, 0, 150); border-radius: 10px;")
+        self.animation_label.hide()
+
+        self.animation_text = ["Generating video", "Generating video ⚫", "Generating video ⚫⚫", "Generating video ⚫⚫⚫"]
         self.animation_index = 0
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self.update_animation)
@@ -215,10 +249,6 @@ class TTS(QMainWindow):
         self.media_player.setAudioOutput(self.audio_output)
         self.audio_output.setVolume(0.5)  # 0.5 = 50% volume
 
-
-
-
-        
         # Initialize dataset
         self.dataset_path = "text-to-sign/Dataset/simplified_dataset"
         self.videos = os.listdir(self.dataset_path)
@@ -284,10 +314,8 @@ class TTS(QMainWindow):
             }}
         """
 
-
         self.setup_ui()
 
-        
     def setup_ui(self):
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -295,23 +323,7 @@ class TTS(QMainWindow):
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
         
-
         self.create_main_content()
-
-    def handle_navigation(self, button_text):
-        target_file = self.pages[button_text]
-        current_file = os.path.basename(__file__)
-        
-        if target_file != current_file:
-            # Save any necessary state here
-            
-            # Launch the target Python file
-            python_executable = sys.executable
-            subprocess.Popen([python_executable, target_file])
-            
-            # Close the current window
-            self.close()
-
 
     def create_main_content(self):
         main_widget = QWidget()
@@ -373,7 +385,7 @@ class TTS(QMainWindow):
         right_frame = QFrame()
         right_frame.setStyleSheet("""
             QFrame {
-                background-color: white;
+                background-color: #ffffff;
                 border-radius: 15px;
                 border: 1px solid #e0e0e0;
             }
@@ -400,6 +412,8 @@ class TTS(QMainWindow):
             border: none;
             padding-bottom: 5px;
             border-bottom: 2px solid #eef2f7;
+            background-color: #ffffff;
+
         """)
 
         # Video Controls
@@ -431,29 +445,23 @@ class TTS(QMainWindow):
             }
         """
 
-        self.play_pause_btn = QPushButton("Play")
-        # self.mute_btn = QPushButton("Unmute")
-        
+        self.play_pause_btn = QPushButton("▶ Play")
         self.play_pause_btn.setStyleSheet(control_btn_style.replace("#2962ff", "#00c853"))
-        # self.mute_btn.setStyleSheet(control_btn_style.replace("#2962ff", "#ff1744"))
-        
         self.play_pause_btn.clicked.connect(self.toggle_play_pause)
-        # self.mute_btn.clicked.connect(self.toggle_mute)
         
         video_controls.addWidget(self.play_pause_btn)
-        # video_controls.addWidget(self.mute_btn)
         video_controls.addStretch()
 
         self.video_widget = QVideoWidget()
         self.video_widget.setMinimumSize(450, 350)
         self.video_widget.setStyleSheet("""
-            background-color: #f8fafc;
+            background-color: #ffffff;
             border-radius: 12px;
             border: 2px solid #eef2f7;
         """)
         self.media_player.setVideoOutput(self.video_widget)
 
-         # Enhanced Speed Controls with better responsive design
+        # Enhanced Speed Controls with better responsive design
         speed_control_layout = QHBoxLayout()
         speed_control_layout.setSpacing(20)
         speed_control_layout.setContentsMargins(0, 15, 0, 15)
@@ -505,9 +513,7 @@ class TTS(QMainWindow):
             }
         """)
 
-        # In create_main_content, after creating the speed slider
         self.speed_slider.valueChanged.connect(self.update_speed)
-
 
         # Modern speed labels
         speed_label_style = """
@@ -523,12 +529,12 @@ class TTS(QMainWindow):
             }
         """
 
-        slow_label = QLabel("0.25x")
-        fast_label = QLabel("2.00x")
+        slow_label = QLabel("🐌 0.25x")  # Snail for slow
+        fast_label = QLabel("🚀 2.00x")  # Rocket for fast
         slow_label.setStyleSheet(speed_label_style)
         fast_label.setStyleSheet(speed_label_style)
 
-        self.speed_label = QLabel("1.00x")
+        self.speed_label = QLabel("⚡ 1.00x")
         self.speed_label.setStyleSheet("""
             QLabel {
                 color: #2962ff;
@@ -552,7 +558,6 @@ class TTS(QMainWindow):
 
         speed_control_layout.addWidget(slider_frame)
 
-
         # Action Buttons
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(20)
@@ -566,8 +571,10 @@ class TTS(QMainWindow):
                 font-size: 15px;
                 font-weight: 600;
                 font-family: 'Segoe UI';
-                min-width: 100px;
+                min-width: 120px;
                 min-height: 40px;
+                padding-left: 15px;
+                padding-right: 15px;
             }
             QPushButton:hover {
                 background-color: #1e88e5;
@@ -579,19 +586,21 @@ class TTS(QMainWindow):
             }
         """
 
+        # Define buttons with icons
         buttons = [
-            ("Send", "#2962ff"),
-            ("Clear", "#ff1744"),
-            ("Copy", "#00c853"),
-            ("Paste", "#6200ea")
+            ("▶ Send", "#2962ff", self.send_text),
+            ("🗑️ Clear", "#ff1744", self.clear_text), 
+            ("📋 Copy", "#00c853", self.copy_text),
+            ("📎 Paste", "#6200ea", self.paste_text)
         ]
 
-        for text, color in buttons:
+        for text, color, callback in buttons:
             btn = QPushButton(text)
             btn.setStyleSheet(button_style.replace("#2962ff", color))
             btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(callback)
             buttons_layout.addWidget(btn)
-            
+                    
             if text == "Send":
                 btn.clicked.connect(self.send_text)
             elif text == "Clear":
@@ -616,31 +625,18 @@ class TTS(QMainWindow):
 
         self.main_layout.addWidget(main_widget)
 
-
-
-
     def toggle_play_pause(self):
         if self.media_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
             self.media_player.pause()
-            self.play_pause_btn.setText("Play")
+            self.play_pause_btn.setText("▶ Play")
         else:
             self.media_player.play()
-            self.play_pause_btn.setText("Pause")
+            self.play_pause_btn.setText("⏸ Pause")
 
-    def toggle_mute(self):
-        if self.audio_output.isMuted():
-            self.audio_output.setMuted(False)
-            self.mute_btn.setText("Mute")
-        else:
-            self.audio_output.setMuted(True)
-            self.mute_btn.setText("Unmute")
-
-        # Add this method to your class to handle slider value changes
     def update_speed(self):
-            speed = self.speed_slider.value() / 100.0
-            self.speed_label.setText(f"{speed:.2f}x")
-            self.media_player.setPlaybackRate(speed)
-
+        speed = self.speed_slider.value() / 100.0
+        self.speed_label.setText(f"⚡ {speed:.2f}x")
+        self.media_player.setPlaybackRate(speed)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -649,35 +645,59 @@ class TTS(QMainWindow):
             spinner_x = video_rect.x() + (video_rect.width() - self.loading_spinner.width()) // 2
             spinner_y = video_rect.y() + (video_rect.height() - self.loading_spinner.height()) // 2
             self.loading_spinner.move(spinner_x, spinner_y)
+            self.animation_label.move(spinner_x, spinner_y + self.loading_spinner.height() + 10)
 
     def show_loading_animation(self):
-        if self.loading_spinner:
-            self.loading_spinner.raise_()
-            self.loading_spinner.start()
-            self.animation_timer.start(500)
+        if not self.loading_movie.isValid():
+            print("Error: Loading GIF is not valid or not found.")
+            return
+
+        # Center the spinner on the video widget
+        video_rect = self.video_widget.geometry()
+        spinner_x = video_rect.x() + (video_rect.width() - self.loading_spinner.width()) // 2
+        spinner_y = video_rect.y() + (video_rect.height() - self.loading_spinner.height()) // 2
+        self.loading_spinner.move(spinner_x, spinner_y)
+        
+        # Ensure the spinner is visible and on top
+        self.loading_spinner.setStyleSheet("background-color: transparent;")
+        self.loading_spinner.raise_()  # Bring to the front
+        self.loading_spinner.show()
+        self.loading_movie.start()
+        
+        # Debugging: Check if the GIF is playing
+        if self.loading_movie.state() == QMovie.Running:
+            print("GIF is playing")
+        else:
+            print("GIF is not playing")
+        
+        # Start the animation text timer
+        self.animation_timer.start(500)
+        print("Loading animation shown")
 
     def hide_loading_animation(self):
-        if self.loading_spinner:
-            self.loading_spinner.stop()
+        if self.loading_spinner.isVisible():  # Only hide if currently visible
+            self.loading_movie.stop()
+            self.loading_spinner.hide()
             self.animation_timer.stop()
+            print("Loading animation hidden")
 
     def update_animation(self):
-        if self.loading_spinner and self.loading_spinner.isVisible():
-            self.animation_index = (self.animation_index + 1) % len(self.animation_text)
-            self.loading_spinner.update()
-
+        self.animation_index = (self.animation_index + 1) % len(self.animation_text)
+        self.animation_label.setText(self.animation_text[self.animation_index])
 
     def handle_media_status(self, status):
+        # Debugging: Print the media status
+        print(f"Media status: {status}")
+
         if status == QMediaPlayer.MediaStatus.LoadingMedia:
-            if self.loading_spinner:
-                self.loading_spinner.raise_()  # Ensures spinner stays on top
-                self.loading_spinner.start()
-        elif status == QMediaPlayer.MediaStatus.LoadedMedia:
-            if self.loading_spinner:
-                self.loading_spinner.stop()
-        elif status == QMediaPlayer.MediaStatus.InvalidMedia:
-            if self.loading_spinner:
-                self.loading_spinner.stop()
+            if not self.is_loading:  # Only show if not already loading
+                self.is_loading = True
+                self.show_loading_animation()
+        elif status in [QMediaPlayer.MediaStatus.LoadedMedia, QMediaPlayer.MediaStatus.BufferedMedia]:
+            if self.is_loading:  # Only hide if currently loading
+                # Delay hiding the animation by 1 second
+                self.hide_animation_timer.start(1000)  # 1000 ms = 1 second
+                self.is_loading = False
 
     def send_text(self):
         if self.is_processing:
@@ -705,12 +725,10 @@ class TTS(QMainWindow):
                 video_url = QUrl.fromLocalFile(os.path.abspath(output_path))
                 self.media_player.setSource(video_url)
                 self.media_player.play()
-                self.play_pause_btn.setText("Pause")
-                self.mute_btn.setText("Mute")
+                self.play_pause_btn.setText("⏸ Pause")
         finally:
             self.is_processing = False
             self.hide_loading_animation()
-
 
     def clear_text(self):
         self.text_input.clear()
@@ -720,76 +738,6 @@ class TTS(QMainWindow):
 
     def paste_text(self):
         self.text_input.paste()
-    def update_animation(self):
-        if hasattr(self, 'init_animation_label'):
-            self.animation_index = (self.animation_index + 1) % len(self.animation_text)
-            self.init_animation_label.setText(self.animation_text[self.animation_index])
-
-
-    def update_player_controls(self):
-        # Update play/pause button text
-        if self.media_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
-            self.play_pause_btn.setText("Pause")
-        else:
-            self.play_pause_btn.setText("Play")
-            
-        # Update mute button text
-        if self.audio_output.isMuted():
-            self.mute_btn.setText("Unmute")
-        else:
-            self.mute_btn.setText("Mute")
-            
-        # Update volume slider
-        
-
-    def set_playback_speed(self, speed):
-        self.media_player.setPlaybackRate(speed)
-
-    def speed_up(self):
-        current_speed = self.media_player.playbackRate()
-        new_speed = min(current_speed + 0.25, 2.0)  # Max speed 2x
-        self.set_playback_speed(new_speed)
-        self.speed_label.setText(f"{new_speed:.2f}x")
-
-    def slow_down(self):
-        current_speed = self.media_player.playbackRate()
-        new_speed = max(current_speed - 0.25, 0.25)  # Min speed 0.25x
-        self.set_playback_speed(new_speed)
-        self.speed_label.setText(f"{new_speed:.2f}x")
-
-
-    def _process_text(self):
-        try:
-            # Get and validate input text
-            text = self.text_input.toPlainText()
-            if not text.strip():
-                return
-                    
-            # Reset playback state
-            self.media_player.stop()
-            self.set_playback_speed(1.0)  # Reset speed to normal
-            self.speed_label.setText("1.00x")
-                
-            # Process text to sign language video
-            output_path = text_to_sign(text, self.video_names, self.dataset_path)
-                
-            # Play the generated video if successful
-            if output_path and os.path.exists(output_path):
-                video_url = QUrl.fromLocalFile(os.path.abspath(output_path))
-                self.media_player.setSource(video_url)
-                self.media_player.play()
-                self.play_pause_btn.setText("Pause")
-                self.update_player_controls()
-                
-        except Exception as e:
-            print(f"Video processing error: {str(e)}")
-            
-        finally:
-            # Reset processing state
-            self.is_processing = False
-            self.hide_loading_animation()
-
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

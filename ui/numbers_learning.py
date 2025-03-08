@@ -181,26 +181,9 @@ class NumbersLearning(QWidget):
         self.media_player.setVideoOutput(self.video_widget)
         self.media_player.setAudioOutput(self.audio_output)
         
-        # Control buttons
+       # Control buttons
         control_layout = QHBoxLayout()
-        
-        replay_button = QPushButton("Replay")
-        replay_button.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2980b9, stop:1 #3498db);
-                color: white;
-                padding: 12px 25px;
-                border-radius: 12px;
-                font-weight: bold;
-                font-size: 16px;
-                margin: 10px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2473a7, stop:1 #2980b9);
-            }
-        """)
-        replay_button.clicked.connect(self.replay_video)
-        
+
         close_button = QPushButton("Close")
         close_button.setStyleSheet("""
             QPushButton {
@@ -217,8 +200,7 @@ class NumbersLearning(QWidget):
             }
         """)
         close_button.clicked.connect(self.close_video)
-        
-        control_layout.addWidget(replay_button)
+
         control_layout.addWidget(close_button)
         
         # Add widgets to layout
@@ -257,13 +239,19 @@ class NumbersLearning(QWidget):
         # If no video is found, return None
         return None
 
-    def play_video(self, number):
-        video_path = self.get_video_path(number)
+    def play_video(self, day):
+        video_path = self.get_video_path(day)
         if video_path:
             self.media_player.setSource(QUrl.fromLocalFile(video_path))
+            self.media_player.mediaStatusChanged.connect(self.handle_media_status)
             self.media_player.play()
         else:
-            self.show_error_popup(f"Video for {number} not found")
+            self.show_error_popup(f"Video for {day} not found")
+
+    def handle_media_status(self, status):
+        if status == QMediaPlayer.MediaStatus.EndOfMedia:
+            self.media_player.setPosition(0)
+            self.media_player.play()
 
     def replay_video(self):
         self.media_player.setPosition(0)

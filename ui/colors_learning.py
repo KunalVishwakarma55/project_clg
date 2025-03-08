@@ -180,24 +180,7 @@ class ColorsLearning(QWidget):
         
         # Control buttons
         control_layout = QHBoxLayout()
-        
-        replay_button = QPushButton("Replay")
-        replay_button.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2980b9, stop:1 #3498db);
-                color: white;
-                padding: 12px 25px;
-                border-radius: 12px;
-                font-weight: bold;
-                font-size: 16px;
-                margin: 10px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2473a7, stop:1 #2980b9);
-            }
-        """)
-        replay_button.clicked.connect(self.replay_video)
-        
+
         close_button = QPushButton("Close")
         close_button.setStyleSheet("""
             QPushButton {
@@ -214,8 +197,7 @@ class ColorsLearning(QWidget):
             }
         """)
         close_button.clicked.connect(self.close_video)
-        
-        control_layout.addWidget(replay_button)
+
         control_layout.addWidget(close_button)
         
         # Add widgets to layout
@@ -238,6 +220,7 @@ class ColorsLearning(QWidget):
         video_path = self.get_video_path(color)
         if video_path:
             self.media_player.setSource(QUrl.fromLocalFile(video_path))
+            self.media_player.mediaStatusChanged.connect(self.handle_media_status)
             self.media_player.play()
         else:
             self.show_error_popup(f"Video for {color} not found")
@@ -267,6 +250,11 @@ class ColorsLearning(QWidget):
             if not self.sign_display.isHidden():
                 self.sign_display.deleteLater()
                 self.sign_display = None
+
+    def handle_media_status(self, status):
+        if status == QMediaPlayer.MediaStatus.EndOfMedia:
+            self.media_player.setPosition(0)
+            self.media_player.play()
 
     def show_error_popup(self, message):
         error_popup = QFrame(self)

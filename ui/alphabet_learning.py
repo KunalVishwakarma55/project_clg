@@ -239,24 +239,7 @@ class AlphabetLearning(QWidget):
         
         # Control buttons
         control_layout = QHBoxLayout()
-        
-        replay_button = QPushButton("Replay Name")
-        replay_button.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2980b9, stop:1 #3498db);
-                color: white;
-                padding: 12px 25px;
-                border-radius: 12px;
-                font-weight: bold;
-                font-size: 16px;
-                margin: 10px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2473a7, stop:1 #2980b9);
-            }
-        """)
-        replay_button.clicked.connect(self.replay_name)
-        
+
         close_button = QPushButton("Close")
         close_button.setStyleSheet("""
             QPushButton {
@@ -273,8 +256,7 @@ class AlphabetLearning(QWidget):
             }
         """)
         close_button.clicked.connect(self.close_video)
-        
-        control_layout.addWidget(replay_button)
+
         control_layout.addWidget(close_button)
         
         # Add widgets to layout
@@ -305,7 +287,7 @@ class AlphabetLearning(QWidget):
 
     
     def play_next_letter(self):
-        if self.current_letter_index < len(self.letters):
+        if hasattr(self, 'sign_display') and self.sign_display and not self.sign_display.isHidden():
             letter = self.letters[self.current_letter_index]
             if hasattr(self, 'progress_label') and self.progress_label:
                 self.progress_label.setText(f"Playing {self.current_letter_index + 1} of {len(self.letters)}: {letter}")
@@ -339,8 +321,13 @@ class AlphabetLearning(QWidget):
         if status == QMediaPlayer.MediaStatus.EndOfMedia:
             self.media_player.mediaStatusChanged.disconnect(self.handle_media_status)
             self.current_letter_index += 1
-            if self.current_letter_index < len(self.letters):
-                QTimer.singleShot(500, self.play_next_letter)
+            
+            # If we reach the end of the sequence, start over
+            if self.current_letter_index >= len(self.letters):
+                self.current_letter_index = 0
+                
+            # Continue playing next letter
+            QTimer.singleShot(500, self.play_next_letter)
 
 
 

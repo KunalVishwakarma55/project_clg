@@ -8,7 +8,7 @@ from PySide6.QtGui import QPixmap
 from .lessons.beginner_mode import BeginnerMode
 from .lessons.intermediate_mode import IntermediateMode
 
-class LessonUI(QWidget):
+class QuizUI(QWidget):
     def __init__(self):
         super().__init__()
         self.stacked_widget = QStackedWidget()
@@ -82,7 +82,7 @@ class LessonUI(QWidget):
         modes = [
             {
                 "title": "Beginner Mode",
-                "image": "assets/beginner.png",
+                "image": "assets/beginner.jpg",
                 "color": "#3498db",
                 "description": "Start your ASL journey with alphabet basics",
                 "features": ["Learn A-Z Signs", "Interactive Quizzes", "Progress Tracking"]
@@ -202,7 +202,7 @@ class LessonUI(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = LessonUI()
+    window = QuizUI()
     window.setWindowTitle("ASL Learning Center")
     window.show()
     sys.exit(app.exec())
