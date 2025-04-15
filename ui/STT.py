@@ -203,6 +203,7 @@ class STT(QMainWindow):
         stop_btn.setFixedWidth(180)
         
         start_btn.clicked.connect(self.start_camera)
+        
         stop_btn.clicked.connect(self.stop_camera)
 
         camera_buttons.addStretch()

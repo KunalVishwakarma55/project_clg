@@ -22,6 +22,7 @@ from PySide6.QtGui import QFont, QPixmap, QColor, QMovie
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 
+
 # Initialize NLTK components
 nltk.download('punkt')
 nltk.download('wordnet')

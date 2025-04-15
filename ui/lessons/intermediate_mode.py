@@ -264,27 +264,22 @@ class IntermediateMode(QWidget):
         # Video Controls
         controls_layout = QHBoxLayout()
         self.play_button = QPushButton("Play")
-        self.replay_button = QPushButton("Replay")
-        self.hint_button = QPushButton("Hint (Cost: 5 points)")
 
-        for button in [self.play_button, self.replay_button, self.hint_button]:
-            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            button.setStyleSheet("""
-                QPushButton {
-                    background-color: #3498db;
-                    color: white;
-                    padding: 10px;
-                    border-radius: 10px;
-                    font-size: 16px;
-                }
-                QPushButton:hover {
-                    background-color: #2980b9;
-                }
-            """)
-
+        self.play_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.play_button.setStyleSheet("""
+            QPushButton {
+                background-color: #3498db;
+                color: white;
+                padding: 10px;
+                border-radius: 10px;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #2980b9;
+            }
+        """)
         controls_layout.addWidget(self.play_button)
-        controls_layout.addWidget(self.replay_button)
-        controls_layout.addWidget(self.hint_button)
+            
 
         left_layout.addWidget(video_title)
         left_layout.addWidget(self.practice_mode_btn)
@@ -314,8 +309,6 @@ class IntermediateMode(QWidget):
         # Initially hide video elements
         self.video_widget.hide()
         self.play_button.hide()
-        self.replay_button.hide()
-        self.hint_button.hide()
 
         # Right Frame
         right_frame = QFrame()
@@ -449,11 +442,17 @@ class IntermediateMode(QWidget):
         self.media_player.setVideoOutput(self.video_widget)
         self.media_player.setAudioOutput(self.audio_output)
         self.audio_output.setVolume(0.7)
+
+        self.media_player.mediaStatusChanged.connect(self.handle_media_status)
         
         self.play_button.clicked.connect(self.play_video)
-        self.replay_button.clicked.connect(self.replay_video)
-        self.hint_button.clicked.connect(self.show_hint)
         self.media_player.errorOccurred.connect(self.handle_media_error)
+
+    def handle_media_status(self, status):
+        """Handle media status changes to implement looping."""
+        if status == QMediaPlayer.EndOfMedia:
+            self.media_player.setPosition(0)  # Reset to beginning
+            self.media_player.play()  # Start playing again
 
     def setup_sounds(self):
         """Initialize sound effects."""
@@ -949,8 +948,6 @@ class IntermediateMode(QWidget):
         self.start_button.hide()
         self.video_widget.show()
         self.play_button.show()
-        self.replay_button.show()
-        self.hint_button.show()
         
         for btn in self.choice_buttons:
             btn.setEnabled(True)
@@ -1212,8 +1209,6 @@ class IntermediateMode(QWidget):
         # Reset video elements visibility
         self.video_widget.hide()
         self.play_button.hide()
-        self.replay_button.hide()
-        self.hint_button.hide()
         
         # Show start button
         self.start_button.show()

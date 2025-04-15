@@ -1,7 +1,6 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-    QPushButton, QFrame, QScrollArea, QGridLayout, QGraphicsDropShadowEffect
-)
+    QPushButton, QFrame, QScrollArea, QGridLayout, QGraphicsDropShadowEffect)
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QPixmap, QIcon, QColor, QPalette, QLinearGradient, QBrush, QFont
 import os
@@ -11,7 +10,6 @@ from .colors_learning import ColorsLearning
 from .numbers_learning import NumbersLearning
 from .months_learning import MonthsLearning
 from .greetings_learning import GreetingsLearning
-
 
 class LearningSection(QWidget):
     def __init__(self):
@@ -53,7 +51,6 @@ class LearningSection(QWidget):
         self.grid_layout.setContentsMargins(20, 20, 20, 20)
         
         # Define categories with local image paths
-        # Replace the categories list with:
         self.categories = [
             ("", "assets/cards_image/alphabet.jpg", "", "#FF6B6B"),
             ("", "assets/cards_image/greetings.jpg", "", "#4ECDC4"), 
@@ -114,13 +111,12 @@ class LearningSection(QWidget):
         window_width = self.width()
         columns = max(2, min(3, window_width // 450))  # Updated from 400 to 450
         
-        for i in reversed(range(self.grid_layout.count())): 
+        for i in reversed(range(self.grid_layout.count())):
             self.grid_layout.itemAt(i).widget().setParent(None)
         
         for index, (title, image_path, description, color) in enumerate(self.categories):
             card = self.create_category_card(title, image_path, description, color)
             self.grid_layout.addWidget(card, index // columns, index % columns)
-
 
     def create_category_card(self, title, image_path, description, color):
         card = QFrame()
@@ -138,7 +134,6 @@ class LearningSection(QWidget):
                 box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
             }}
         """)
-
         layout = QVBoxLayout(card)
         layout.setSpacing(5)  # Add spacing between elements
         layout.setContentsMargins(0, 0, 0, 5)  # Add bottom margin
@@ -165,7 +160,6 @@ class LearningSection(QWidget):
         learn_btn.setIcon(QIcon("assets/play_icon.png"))  # Add play icon
         learn_btn.setFixedSize(450, 60)  # Match card width
         learn_btn.setIconSize(QSize(24, 24))  # Icon size
-
         button_color = ""
         if "alphabet" in image_path:
             button_color = "#FF7777"  # Salmon Red
@@ -201,8 +195,7 @@ class LearningSection(QWidget):
             }}
         """)
         learn_btn.setCursor(Qt.PointingHandCursor)
-            
-
+        
         # Button connections based on image path
         if "alphabet" in image_path:
             learn_btn.clicked.connect(self.open_alphabet_learning)
@@ -218,50 +211,48 @@ class LearningSection(QWidget):
             learn_btn.clicked.connect(self.open_greetings_learning)
         else:
             learn_btn.clicked.connect(lambda: self.open_video_player(title))
-
         layout.addWidget(learn_btn)
         
         return card
 
     def open_alphabet_learning(self):
-        from ui.alphabet_learning import AlphabetLearning
         self.alphabet_section = AlphabetLearning()
-        # Get the main window's content area directly
-        main_window = self.window()
-        main_window.content_area.addWidget(self.alphabet_section)
-        main_window.content_area.setCurrentWidget(self.alphabet_section)
+        self.switch_to_section(self.alphabet_section)
 
     def open_days_learning(self):
         self.days_section = DaysLearning()
-        main_window = self.window()
-        main_window.content_area.addWidget(self.days_section)
-        main_window.content_area.setCurrentWidget(self.days_section)
+        self.switch_to_section(self.days_section)
 
     def open_colors_learning(self):
         self.colors_section = ColorsLearning()
-        main_window = self.window()
-        main_window.content_area.addWidget(self.colors_section)
-        main_window.content_area.setCurrentWidget(self.colors_section)
+        self.switch_to_section(self.colors_section)
 
     def open_numbers_learning(self):
         self.numbers_section = NumbersLearning()
-        main_window = self.window()
-        main_window.content_area.addWidget(self.numbers_section)
-        main_window.content_area.setCurrentWidget(self.numbers_section)
+        self.switch_to_section(self.numbers_section)
 
     def open_months_learning(self):
         self.months_section = MonthsLearning()
-        main_window = self.window()
-        main_window.content_area.addWidget(self.months_section)
-        main_window.content_area.setCurrentWidget(self.months_section)
+        self.switch_to_section(self.months_section)
 
     def open_greetings_learning(self):
         self.greetings_section = GreetingsLearning()
+        self.switch_to_section(self.greetings_section)
+    
+    def switch_to_section(self, section):
+        # Get the main window
         main_window = self.window()
-        main_window.content_area.addWidget(self.greetings_section)
-        main_window.content_area.setCurrentWidget(self.greetings_section)
-
-
+        
+        # Add the new section to the content area
+        main_window.content_area.addWidget(section)
+        
+        # Set the current widget to the new section
+        main_window.content_area.setCurrentWidget(section)
+        
+        # Ensure the navigation bar connections are maintained
+        # This is important to reconnect or update any navigation bar functionality
+        if hasattr(main_window, 'update_navigation'):
+            main_window.update_navigation()
 
     def load_local_image(self, image_label, image_path):
         if os.path.exists(image_path):
@@ -270,7 +261,6 @@ class LearningSection(QWidget):
         else:
             image_label.setText("Image not available")
             image_label.setStyleSheet("font-size: 16px; color: #555;")
-
 
     def create_shadow_effect(self):
         shadow = QGraphicsDropShadowEffect()
