@@ -435,6 +435,9 @@ class BeginnerMode(QWidget):
             self.show_level_transition(new_level)
             self.level_label.setText(f"Level: {new_level}")
 
+        if new_progress >= 26:
+            QTimer.singleShot(1000, self.show_completion_screen)
+
     def handle_wrong_answer(self, selected_letter):
         self.wrong_sound.play()
         self.current_streak = 0
@@ -466,6 +469,133 @@ class BeginnerMode(QWidget):
                         border: 2px solid #219a52;
                     }
                 """)
+
+    def show_completion_screen(self):
+        """Display completion screen when all 26 letters are completed."""
+        self.timer.stop()
+        
+        # Create overlay
+        overlay = QFrame(self)
+        overlay.setStyleSheet("""
+            QFrame {
+                background-color: rgba(0, 0, 0, 0.8);
+            }
+        """)
+        overlay.setGeometry(self.rect())
+        
+        # Create completion dialog
+        dialog = QFrame(overlay)
+        dialog.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border: 3px solid #27ae60;
+                border-radius: 20px;
+                padding: 30px;
+            }
+        """)
+        
+        dialog_layout = QVBoxLayout(dialog)
+        
+        # Congratulations message
+        congrats = QLabel("🎊 Congratulations! 🎊")
+        congrats.setStyleSheet("""
+            font-size: 32px;
+            color: #27ae60;
+            font-weight: bold;
+        """)
+        
+        message = QLabel("You've completed all 26 ASL letters!")
+        message.setStyleSheet("""
+            font-size: 22px;
+            padding: 15px;
+            color: #2c3e50;
+        """)
+        message.setAlignment(Qt.AlignCenter)
+        
+        # Final score
+        score_display = QLabel(f"Final Score: {self.score} 💎")
+        score_display.setStyleSheet("""
+            font-size: 28px;
+            color: #2980b9;
+            font-weight: bold;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            margin: 10px;
+        """)
+        
+        # Buttons
+        buttons = QHBoxLayout()
+        stats_btn = QPushButton("View Statistics 📊")
+        exit_btn = QPushButton("Exit to Menu 🏠")
+        
+        stats_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #9b59b6;
+                color: white;
+                border-radius: 12px;
+                padding: 15px 25px;
+                font-size: 18px;
+                font-weight: bold;
+                margin: 10px;
+            }
+            QPushButton:hover {
+                background-color: #8e44ad;
+            }
+        """)
+        
+        exit_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3498db;
+                color: white;
+                border-radius: 12px;
+                padding: 15px 25px;
+                font-size: 18px;
+                font-weight: bold;
+                margin: 10px;
+            }
+            QPushButton:hover {
+                background-color: #2980b9;
+            }
+        """)
+        
+        buttons.addWidget(stats_btn)
+        buttons.addWidget(exit_btn)
+        
+        dialog_layout.addWidget(congrats, alignment=Qt.AlignCenter)
+        dialog_layout.addWidget(message, alignment=Qt.AlignCenter)
+        dialog_layout.addWidget(score_display, alignment=Qt.AlignCenter)
+        dialog_layout.addLayout(buttons)
+        
+        # Center the dialog
+        overlay_layout = QVBoxLayout(overlay)
+        overlay_layout.addWidget(dialog, alignment=Qt.AlignCenter)
+        
+        overlay.show()
+        
+        # Connect buttons
+        stats_btn.clicked.connect(lambda: self.show_statistics_from_completion(overlay))
+        exit_btn.clicked.connect(lambda: self.exit_to_menu(overlay))
+
+    def show_statistics_from_completion(self, overlay):
+        """Show statistics from completion screen."""
+        overlay.hide()
+        self.show_statistics()
+
+    def exit_to_menu(self, overlay):
+        """Exit to menu from completion screen."""
+        try:
+            main_window = self.window()
+            if hasattr(main_window, 'navbar'):
+                main_window.navbar.setEnabled(True)
+        except:
+            pass
+        
+        self.reset_test()
+        overlay.deleteLater()
+        self.parent().setCurrentIndex(0)
+
+
 
     def show_success_emoji(self):
         success_label = QLabel("🎉", self)
@@ -769,20 +899,25 @@ class BeginnerMode(QWidget):
         self.time_remaining = 30
         self.timer.stop()
         self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("Progress: 0/26 Letters")
+        self.level_label.setText("Level: 1")
         self.stats = {
             'total_attempts': 0,
             'correct_answers': 0,
             'average_time': 0,
             'best_time': float('inf')
         }
-        
+                
         # Reset UI elements
         self.score_label.setText("Score: 0")
         self.streak_label.setText("Streak: 0 🔥")
         self.best_streak_label.setText("Best: 0 ⭐")
-        self.progress_bar.setFormat("Progress: 0/26 Letters")
         self.timer_label.setText("Time: 30s")
         self.bonus_label.clear()
+        
+        # Load a new question to start fresh
+        self.load_new_question()
+
 
 
     def reset_buttons_and_load_new(self):
