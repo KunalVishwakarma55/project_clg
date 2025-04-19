@@ -474,108 +474,214 @@ class BeginnerMode(QWidget):
         """Display completion screen when all 26 letters are completed."""
         self.timer.stop()
         
-        # Create overlay
-        overlay = QFrame(self)
-        overlay.setStyleSheet("""
-            QFrame {
-                background-color: rgba(0, 0, 0, 0.8);
-            }
-        """)
-        overlay.setGeometry(self.rect())
+        # Create a semi-transparent overlay for the entire application
+        self.completion_overlay = QFrame(self)
+        self.completion_overlay.setStyleSheet("background-color: rgba(0, 0, 0, 0.8);")  # Darker overlay
+        self.completion_overlay.setGeometry(self.rect())
+        self.completion_overlay.raise_()  # Make sure overlay is on top
         
-        # Create completion dialog
-        dialog = QFrame(overlay)
-        dialog.setStyleSheet("""
+        # Create a container for the completion message
+        completion_container = QFrame(self.completion_overlay)
+        completion_container.setStyleSheet("""
             QFrame {
                 background-color: white;
-                border: 3px solid #27ae60;
+                border: 4px solid #3498db;
                 border-radius: 20px;
-                padding: 30px;
             }
         """)
+        # Set fixed width to prevent text cutoff
+        completion_container.setFixedWidth(500)
         
-        dialog_layout = QVBoxLayout(dialog)
+        # Create layout for the completion container with appropriate margins
+        container_layout = QVBoxLayout(completion_container)
+        container_layout.setContentsMargins(20, 20, 20, 20)
+        container_layout.setSpacing(10)
         
-        # Congratulations message
-        congrats = QLabel("🎊 Congratulations! 🎊")
-        congrats.setStyleSheet("""
-            font-size: 32px;
-            color: #27ae60;
+        # Trophy icon
+        trophy_label = QLabel("🏆")
+        trophy_label.setStyleSheet("font-size: 32px; margin-bottom: 5px;")
+        trophy_label.setAlignment(Qt.AlignCenter)
+        container_layout.addWidget(trophy_label)
+        
+        # Add congratulations message with improved color
+        congrats_label = QLabel("🎉 Congratulations! 🎉")
+        congrats_label.setStyleSheet("""
+            font-size: 24px;
             font-weight: bold;
-        """)
-        
-        message = QLabel("You've completed all 26 ASL letters!")
-        message.setStyleSheet("""
-            font-size: 22px;
-            padding: 15px;
-            color: #2c3e50;
-        """)
-        message.setAlignment(Qt.AlignCenter)
-        
-        # Final score
-        score_display = QLabel(f"Final Score: {self.score} 💎")
-        score_display.setStyleSheet("""
-            font-size: 28px;
-            color: #2980b9;
-            font-weight: bold;
-            padding: 15px;
-            background-color: #f8f9fa;
+            color: #16a085;  /* Darker teal green for stronger contrast */
+            background-color: #e8f8f5;  /* Light teal background */
             border-radius: 10px;
-            margin: 10px;
+            padding: 8px;
         """)
+        congrats_label.setAlignment(Qt.AlignCenter)
+        container_layout.addWidget(congrats_label)
         
-        # Buttons
-        buttons = QHBoxLayout()
-        stats_btn = QPushButton("View Statistics 📊")
-        exit_btn = QPushButton("Exit to Menu 🏠")
+        # Add completion message with improved color
+        completion_message = QLabel("You've mastered all 26 ASL letters!")
+        completion_message.setStyleSheet("""
+            font-size: 18px;
+            color: #1e3799;  /* Darker blue for better readability */
+            padding: 10px;
+            background-color: #e8f0ff;  /* Light blue background */
+            border-radius: 10px;
+            font-weight: bold;
+        """)
+        completion_message.setAlignment(Qt.AlignCenter)
+        completion_message.setWordWrap(True)
+        container_layout.addWidget(completion_message)
         
-        stats_btn.setStyleSheet("""
+        # Add score container with improved colors
+        score_container = QFrame()
+        score_container.setStyleSheet("""
+            background-color: #d6eaf8;  /* Slightly darker background for better contrast */
+            border-radius: 10px;
+            border: 1px solid #3498db;
+            padding: 5px;
+        """)
+        score_layout = QVBoxLayout(score_container)
+        score_layout.setContentsMargins(10, 10, 10, 10)
+        score_layout.setSpacing(5)
+        
+        # Score information with improved colors
+        final_score = QLabel(f"Final Score: {self.score} 💎")
+        final_score.setStyleSheet("""
+            font-size: 16px; 
+            font-weight: bold; 
+            color: #1a5276;  /* Darker blue for better contrast */
+        """)
+        final_score.setAlignment(Qt.AlignCenter)
+        score_layout.addWidget(final_score)
+        
+        best_streak = QLabel(f"Best Streak: {self.best_streak} 🔥")
+        best_streak.setStyleSheet("""
+            font-size: 16px; 
+            font-weight: bold; 
+            color: #a93226;  /* Darker orange/red for better contrast */
+        """)
+        best_streak.setAlignment(Qt.AlignCenter)
+        score_layout.addWidget(best_streak)
+        
+        container_layout.addWidget(score_container)
+        
+        # Add statistics with improved colors and checks for valid values
+        if self.stats['correct_answers'] > 0:
+            stats_frame = QFrame()
+            stats_frame.setStyleSheet("""
+                background-color: #d5f5e3;  /* Slightly darker green background */
+                border-radius: 10px;
+                border: 1px solid #27ae60;
+                padding: 10px;
+            """)
+            stats_layout = QVBoxLayout(stats_frame)
+            stats_layout.setContentsMargins(10, 10, 10, 10)
+            stats_layout.setSpacing(5)
+            
+            # Calculate accuracy and check for valid values
+            accuracy = 0
+            if self.stats['total_attempts'] > 0:
+                accuracy = (self.stats['correct_answers'] / self.stats['total_attempts']) * 100
+            
+            # Create simple label for each stat
+            correct_label = QLabel(f"✅ Correct Answers: {self.stats['correct_answers']}")
+            correct_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #196f3d;")
+            correct_label.setAlignment(Qt.AlignCenter)
+            stats_layout.addWidget(correct_label)
+            
+            accuracy_label = QLabel(f"🎯 Accuracy: {accuracy:.1f}%")
+            accuracy_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #7d3c98;")
+            accuracy_label.setAlignment(Qt.AlignCenter)
+            stats_layout.addWidget(accuracy_label)
+            
+            # Check for valid average time
+            avg_time_text = "N/A"
+            if isinstance(self.stats['average_time'], (int, float)) and self.stats['average_time'] != float('inf'):
+                avg_time_text = f"{self.stats['average_time']:.1f}s"
+            
+            avg_time_label = QLabel(f"⏱️ Avg Time: {avg_time_text}")
+            avg_time_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1a5276;")
+            avg_time_label.setAlignment(Qt.AlignCenter)
+            stats_layout.addWidget(avg_time_label)
+            
+            # Check for valid best time
+            best_time_text = "N/A"
+            if isinstance(self.stats['best_time'], (int, float)) and self.stats['best_time'] != float('inf'):
+                best_time_text = f"{self.stats['best_time']:.1f}s"
+            
+            best_time_label = QLabel(f"🚀 Best Time: {best_time_text}")
+            best_time_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #a93226;")
+            best_time_label.setAlignment(Qt.AlignCenter)
+            stats_layout.addWidget(best_time_label)
+            
+            container_layout.addWidget(stats_frame)
+        else:
+            stats_label = QLabel("No correct answers recorded.")
+            stats_label.setStyleSheet("font-size: 16px; color: #c0392b; font-weight: bold;")
+            stats_label.setAlignment(Qt.AlignCenter)
+            container_layout.addWidget(stats_label)
+        
+        # Add buttons with enhanced styling
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(15)
+        
+        restart_button = QPushButton("🔄 Restart")
+        restart_button.setStyleSheet("""
             QPushButton {
-                background-color: #9b59b6;
+                background-color: #2980b9;  /* Darker blue */
                 color: white;
                 border-radius: 12px;
-                padding: 15px 25px;
-                font-size: 18px;
+                font-size: 16px;
                 font-weight: bold;
-                margin: 10px;
+                padding: 8px 15px;
+                border: 2px solid #1a5276;  /* Dark border */
             }
             QPushButton:hover {
-                background-color: #8e44ad;
+                background-color: #1a5276;  /* Even darker on hover */
+                border: 2px solid #154360;
             }
         """)
+        restart_button.clicked.connect(lambda: self.restart_test())
         
-        exit_btn.setStyleSheet("""
+        menu_button = QPushButton("🏠 Main Menu")
+        menu_button.setStyleSheet("""
             QPushButton {
-                background-color: #3498db;
+                background-color: #c0392b;  /* Darker red */
                 color: white;
                 border-radius: 12px;
-                padding: 15px 25px;
-                font-size: 18px;
+                font-size: 16px;
                 font-weight: bold;
-                margin: 10px;
+                padding: 8px 15px;
+                border: 2px solid #922b21;  /* Dark border */
             }
             QPushButton:hover {
-                background-color: #2980b9;
+                background-color: #922b21;  /* Even darker on hover */
+                border: 2px solid #7b241c;
             }
         """)
+        menu_button.clicked.connect(lambda: self.return_to_menu())
         
-        buttons.addWidget(stats_btn)
-        buttons.addWidget(exit_btn)
+        button_layout.addWidget(restart_button)
+        button_layout.addWidget(menu_button)
         
-        dialog_layout.addWidget(congrats, alignment=Qt.AlignCenter)
-        dialog_layout.addWidget(message, alignment=Qt.AlignCenter)
-        dialog_layout.addWidget(score_display, alignment=Qt.AlignCenter)
-        dialog_layout.addLayout(buttons)
+        container_layout.addLayout(button_layout)
         
-        # Center the dialog
-        overlay_layout = QVBoxLayout(overlay)
-        overlay_layout.addWidget(dialog, alignment=Qt.AlignCenter)
+        # Center the container within the overlay
+        overlay_layout = QVBoxLayout(self.completion_overlay)
+        overlay_layout.addWidget(completion_container, alignment=Qt.AlignCenter)
         
-        overlay.show()
+        # Show the overlay in the parent widget's scope
+        self.completion_overlay.setParent(self)
+        self.completion_overlay.show()
+        self.completion_overlay.raise_()  # Ensure it's on top
+        completion_container.raise_()  # Ensure container is on top of overlay
         
-        # Connect buttons
-        stats_btn.clicked.connect(lambda: self.show_statistics_from_completion(overlay))
-        exit_btn.clicked.connect(lambda: self.exit_to_menu(overlay))
+        # Add animation effect
+        anim = QPropertyAnimation(completion_container, b"pos")
+        anim.setDuration(800)
+        anim.setStartValue(completion_container.pos() + QPoint(0, 30))
+        anim.setEndValue(completion_container.pos())
+        anim.setEasingCurve(QEasingCurve.OutBack)
+        anim.start()
+
 
     def show_statistics_from_completion(self, overlay):
         """Show statistics from completion screen."""
@@ -917,6 +1023,40 @@ class BeginnerMode(QWidget):
         
         # Load a new question to start fresh
         self.load_new_question()
+
+    def restart_test(self):
+        """Restart the test and close the completion overlay."""
+        if hasattr(self, 'completion_overlay'):
+            self.completion_overlay.deleteLater()
+        
+        # Enable navbar if it exists
+        try:
+            main_window = self.window()
+            if hasattr(main_window, 'navbar'):
+                main_window.navbar.setEnabled(True)
+        except:
+            pass
+        
+        # Reset the test
+        self.reset_test()
+
+    def return_to_menu(self):
+        """Return to the main menu and close the completion overlay."""
+        if hasattr(self, 'completion_overlay'):
+            self.completion_overlay.deleteLater()
+        
+        # Enable navbar if it exists
+        try:
+            main_window = self.window()
+            if hasattr(main_window, 'navbar'):
+                main_window.navbar.setEnabled(True)
+        except:
+            pass
+        
+        # Reset the test and go back to the main menu
+        self.reset_test()
+        self.parent().setCurrentIndex(0)
+
 
 
 

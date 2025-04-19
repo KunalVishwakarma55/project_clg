@@ -1,7 +1,7 @@
 import os
 import random
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,QGridLayout,QApplication
 )
 from PySide6.QtCore import Signal  # Add this import
 from PySide6.QtMultimediaWidgets import QVideoWidget
@@ -257,6 +257,30 @@ class IntermediateMode(QWidget):
         """)
         self.practice_mode_btn.toggled.connect(self.toggle_practice_mode)
 
+                # Add hint button for practice mode
+        self.hint_button = QPushButton("Show Hint 💡")
+        self.hint_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.hint_button.setStyleSheet("""
+            QPushButton {
+                background-color: #f39c12;
+                color: white;
+                border-radius: 12px;
+                font-size: 18px;
+                font-weight: bold;
+                padding: 10px;
+                margin: 5px;
+            }
+            QPushButton:hover {
+                background-color: #e67e22;
+            }
+        """)
+        self.hint_button.clicked.connect(self.show_hint)
+        self.hint_button.hide()  # Initially hidden
+
+        # # Add hint button to layout (add this right after adding the practice_mode_btn to the layout)
+        left_layout.addWidget(self.hint_button)
+
+
         # Video Player
         self.video_widget = QVideoWidget()
         self.video_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -478,9 +502,7 @@ class IntermediateMode(QWidget):
 
     def show_hint(self):
         """Show a hint for the current gesture."""
-        if self.score >= 5:
-            self.score -= 5
-            self.score_label.setText(f"Score: {self.score}")
+        if self.current_gesture:
             hint_text = f"This gesture means: {self.gestures[self.current_gesture]}"
             hint_label = QLabel(hint_text, self)
             hint_label.setStyleSheet("""
@@ -490,6 +512,7 @@ class IntermediateMode(QWidget):
                 border-radius: 10px;
                 font-weight: bold;
                 font-size: 18px;
+                border: 2px solid #e67e22;
             """)
             hint_label.adjustSize()
             hint_label.move(
@@ -499,6 +522,7 @@ class IntermediateMode(QWidget):
             hint_label.show()
             QTimer.singleShot(3000, hint_label.deleteLater)
 
+
     def update_timer(self):
         """Update the timer and handle time expiration."""
         if not self.practice_mode:
@@ -507,15 +531,51 @@ class IntermediateMode(QWidget):
             if self.time_remaining <= 0:
                 self.timer.stop()
                 self.load_new_gesture()
+                self.start_timer()  # Restart timer for next question
+
 
     def toggle_practice_mode(self, checked):
         """Toggle practice mode on or off."""
         self.practice_mode = checked
         if checked:
             self.timer.stop()
-            self.timer_label.setText("Practice Mode")
+            self.timer_label.setText("Practice Mode 📚")
+            self.practice_mode_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #27ae60;
+                    color: white;
+                    border-radius: 12px;
+                    font-size: 18px;
+                    font-weight: bold;
+                    padding: 10px;
+                    margin: 5px;
+                }
+                QPushButton:checked {
+                    background-color: #27ae60;
+                }
+            """)
+            self.hint_button.show()  # Show hint button in practice mode
         else:
-            self.start_timer()
+            self.time_remaining = 45
+            self.timer_label.setText(f"Time: {self.time_remaining}s")
+            if self.video_widget.isVisible():  # Only start timer if session is active
+                self.start_timer()
+            self.practice_mode_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #95a5a6;
+                    color: white;
+                    border-radius: 12px;
+                    font-size: 18px;
+                    font-weight: bold;
+                    padding: 10px;
+                    margin: 5px;
+                }
+                QPushButton:checked {
+                    background-color: #27ae60;
+                }
+            """)
+            self.hint_button.hide()  # Hide hint button when not in practice mode
+
 
     def start_timer(self):
         """Start or restart the timer."""
@@ -924,16 +984,22 @@ class IntermediateMode(QWidget):
     def check_answer(self, selected_gesture):
         """Handle answer selection"""
         self.stats['total_attempts'] += 1
+        
+        if not self.practice_mode:
+            self.timer.stop()
+        
         self.media_player.pause()
-        self.timer.stop()
         correct_gesture = self.gestures[self.current_gesture]
-
+        
         if selected_gesture == correct_gesture:
             self.handle_correct_answer(selected_gesture)
         else:
             self.handle_wrong_answer(selected_gesture)
+        
+        # In practice mode, give more time to review the answer
+        delay = 3000 if self.practice_mode else 2000
+        QTimer.singleShot(delay, self.proceed_to_next)
 
-        QTimer.singleShot(2000, self.proceed_to_next)
 
 
     def start_session(self):
@@ -944,16 +1010,25 @@ class IntermediateMode(QWidget):
                 main_window.navbar.setEnabled(False)
         except:
             pass
-            
+                    
         self.start_button.hide()
         self.video_widget.show()
         self.play_button.show()
         
+        # Show hint button if in practice mode
+        if self.practice_mode:
+            self.hint_button.show()
+        else:
+            self.hint_button.hide()
+                
         for btn in self.choice_buttons:
             btn.setEnabled(True)
-            
+                    
         self.load_new_gesture()
-        self.start_timer()
+        
+        if not self.practice_mode:
+            self.start_timer()
+
 
     def proceed_to_next(self):
         """Load next gesture after feedback"""
@@ -971,45 +1046,53 @@ class IntermediateMode(QWidget):
                     background-color: #2980b9;
                 }
             """)
-        
+                
         self.load_new_gesture()
         self.media_player.play()
+        
         if not self.practice_mode:
             self.start_timer()
+
 
 
     def handle_correct_answer(self, selected_gesture):
         self.correct_sound.play()
         self.current_streak += 1
         self.best_streak = max(self.current_streak, self.best_streak)
-        
+                
         # Calculate score and bonus
-        time_bonus = max(0, self.time_remaining)
-        bonus_points = time_bonus * 2 * self.bonus_multiplier  # Apply multiplier
-        self.score += (10 * self.bonus_multiplier) + bonus_points  # Apply multiplier to base score too
-        
+        if not self.practice_mode:
+            time_bonus = max(0, self.time_remaining)
+            bonus_points = time_bonus * 2 * self.bonus_multiplier  # Apply multiplier
+            self.score += (10 * self.bonus_multiplier) + bonus_points  # Apply multiplier to base score too
+        else:
+            # In practice mode, just add base points without time bonus
+            self.score += 5
+            bonus_points = 0
+                
         # Show bonus animation if there are bonus points
         if bonus_points > 0:
             self.show_bonus_points(bonus_points)
-        
-        
+                    
         # Update UI
         self.score_label.setText(f"Score: {self.score} 💎")
         self.streak_label.setText(f"Streak: {self.current_streak} 🔥")
         self.best_streak_label.setText(f"Best: {self.best_streak} ⭐")
-        
+                
         # Update statistics
         self.stats['correct_answers'] += 1
-        response_time = 45 - self.time_remaining
-        self.stats['average_time'] = (
-            (self.stats['average_time'] * (self.stats['correct_answers'] - 1) + response_time)
-            / self.stats['correct_answers']
-        )
-        self.stats['best_time'] = min(self.stats['best_time'], response_time)
         
+        if not self.practice_mode:
+            response_time = 45 - self.time_remaining
+            self.stats['average_time'] = (
+                (self.stats['average_time'] * (self.stats['correct_answers'] - 1) + response_time)
+                / self.stats['correct_answers']
+            )
+            self.stats['best_time'] = min(self.stats['best_time'], response_time)
+                
         # Show success animation
         self.show_success_emoji()
-        
+                
         # Highlight correct button
         for btn in self.choice_buttons:
             if btn.text() == selected_gesture:
@@ -1023,14 +1106,266 @@ class IntermediateMode(QWidget):
                         margin: 8px;
                     }
                 """)
-
+                
         # Level calculation
         new_level = (self.stats['correct_answers'] // 5) + 1
         current_level = int(self.level_label.text().split(": ")[1])
-        
+                
         if new_level > current_level:
             self.show_level_transition(new_level)
             self.level_label.setText(f"Level: {new_level}")
+            
+        # Check if user has reached level 2
+        if new_level == 1:
+            # Immediately stop the media player
+            self.media_player.stop()
+            self.media_player.setSource(QUrl())
+            
+            # Delay to allow level transition to complete
+            QTimer.singleShot(2000, self.show_test_completion)
+
+    def destroy_media_player(self):
+        """Completely destroy and recreate the media player to ensure it stops."""
+        if hasattr(self, 'media_player'):
+            self.media_player.stop()
+            self.media_player.setSource(QUrl())
+            self.media_player.deleteLater()
+        
+        if hasattr(self, 'audio_output'):
+            self.audio_output.deleteLater()
+        
+        # Recreate the media player
+        self.media_player = QMediaPlayer()
+        self.audio_output = QAudioOutput()
+        self.media_player.setVideoOutput(self.video_widget)
+        self.media_player.setAudioOutput(self.audio_output)
+        self.audio_output.setVolume(0.7)
+        self.media_player.mediaStatusChanged.connect(self.handle_media_status)
+        self.media_player.errorOccurred.connect(self.handle_media_error)
+
+
+
+    def show_test_completion(self):
+        """Show test completion celebration screen without overlapping the video."""
+        # Stop the timer
+        self.timer.stop()
+        
+        # Force stop the media player
+        self.media_player.stop()
+        self.media_player.setSource(QUrl())
+        
+        # Hide the video widget COMPLETELY
+        self.video_widget.hide()
+        
+        # Create a semi-transparent overlay for the entire application
+        self.completion_overlay = QFrame(self)
+        self.completion_overlay.setStyleSheet("background-color: rgba(0, 0, 0, 0.8);")  # Darker overlay
+        self.completion_overlay.setGeometry(self.rect())
+        self.completion_overlay.raise_()  # Make sure overlay is on top
+        
+        # Create a container for the completion message
+        completion_container = QFrame(self.completion_overlay)
+        completion_container.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border: 4px solid #3498db;
+                border-radius: 20px;
+            }
+        """)
+        # Set fixed width to prevent text cutoff
+        completion_container.setFixedWidth(500)
+        
+        # Create layout for the completion container with appropriate margins
+        container_layout = QVBoxLayout(completion_container)
+        container_layout.setContentsMargins(20, 20, 20, 20)
+        container_layout.setSpacing(10)
+        
+        # Trophy icon
+        trophy_label = QLabel("🏆")
+        trophy_label.setStyleSheet("font-size: 32px; margin-bottom: 5px;")
+        trophy_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        container_layout.addWidget(trophy_label)
+        
+        # Add congratulations message with improved color
+        congrats_label = QLabel("🎉 Congratulations! 🎉")
+        congrats_label.setStyleSheet("""
+            font-size: 24px;
+            font-weight: bold;
+            color: #16a085;  /* Darker teal green for stronger contrast */
+            background-color: #e8f8f5;  /* Light teal background */
+            border-radius: 10px;
+            padding: 8px;
+        """)
+        congrats_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        container_layout.addWidget(congrats_label)
+        
+        # Add completion message with improved color
+        completion_message = QLabel("You've completed the Intermediate Level!")
+        completion_message.setStyleSheet("""
+            font-size: 18px;
+            color: #1e3799;  /* Darker blue for better readability */
+            padding: 10px;
+            background-color: #e8f0ff;  /* Light blue background */
+            border-radius: 10px;
+            font-weight: bold;
+        """)
+        completion_message.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        completion_message.setWordWrap(True)
+        container_layout.addWidget(completion_message)
+        
+        # Add score container with improved colors
+        score_container = QFrame()
+        score_container.setStyleSheet("""
+            background-color: #d6eaf8;  /* Slightly darker background for better contrast */
+            border-radius: 10px;
+            border: 1px solid #3498db;
+            padding: 5px;
+        """)
+        score_layout = QVBoxLayout(score_container)
+        score_layout.setContentsMargins(10, 10, 10, 10)
+        score_layout.setSpacing(5)
+        
+        # Score information with improved colors
+        final_score = QLabel(f"Final Score: {self.score} 💎")
+        final_score.setStyleSheet("""
+            font-size: 16px; 
+            font-weight: bold; 
+            color: #1a5276;  /* Darker blue for better contrast */
+        """)
+        final_score.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        score_layout.addWidget(final_score)
+        
+        best_streak = QLabel(f"Best Streak: {self.best_streak} 🔥")
+        best_streak.setStyleSheet("""
+            font-size: 16px; 
+            font-weight: bold; 
+            color: #a93226;  /* Darker orange/red for better contrast */
+        """)
+        best_streak.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        score_layout.addWidget(best_streak)
+        
+        container_layout.addWidget(score_container)
+        
+        # Add statistics with improved colors and checks for valid values
+        if self.stats['correct_answers'] > 0:
+            stats_frame = QFrame()
+            stats_frame.setStyleSheet("""
+                background-color: #d5f5e3;  /* Slightly darker green background */
+                border-radius: 10px;
+                border: 1px solid #27ae60;
+                padding: 10px;
+            """)
+            stats_layout = QVBoxLayout(stats_frame)
+            stats_layout.setContentsMargins(10, 10, 10, 10)
+            stats_layout.setSpacing(5)
+            
+            # Calculate accuracy and check for valid values
+            accuracy = 0
+            if self.stats['total_attempts'] > 0:
+                accuracy = (self.stats['correct_answers'] / self.stats['total_attempts']) * 100
+            
+            # Create simple label for each stat
+            correct_label = QLabel(f"✅ Correct Answers: {self.stats['correct_answers']}")
+            correct_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #196f3d;")
+            correct_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            stats_layout.addWidget(correct_label)
+            
+            accuracy_label = QLabel(f"🎯 Accuracy: {accuracy:.1f}%")
+            accuracy_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #7d3c98;")
+            accuracy_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            stats_layout.addWidget(accuracy_label)
+            
+            # Check for valid average time
+            avg_time_text = "N/A"
+            if isinstance(self.stats['average_time'], (int, float)) and self.stats['average_time'] != float('inf'):
+                avg_time_text = f"{self.stats['average_time']:.1f}s"
+            
+            avg_time_label = QLabel(f"⏱️ Avg Time: {avg_time_text}")
+            avg_time_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1a5276;")
+            avg_time_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            stats_layout.addWidget(avg_time_label)
+            
+            # Check for valid best time
+            best_time_text = "N/A"
+            if isinstance(self.stats['best_time'], (int, float)) and self.stats['best_time'] != float('inf'):
+                best_time_text = f"{self.stats['best_time']:.1f}s"
+            
+            best_time_label = QLabel(f"🚀 Best Time: {best_time_text}")
+            best_time_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #a93226;")
+            best_time_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            stats_layout.addWidget(best_time_label)
+            
+            container_layout.addWidget(stats_frame)
+        else:
+            stats_label = QLabel("No correct answers recorded.")
+            stats_label.setStyleSheet("font-size: 16px; color: #c0392b; font-weight: bold;")
+            stats_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            container_layout.addWidget(stats_label)
+        
+        # Add buttons with enhanced styling
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(15)
+        
+        restart_button = QPushButton("🔄 Restart")
+        restart_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2980b9;  /* Darker blue */
+                color: white;
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: bold;
+                padding: 8px 15px;
+                border: 2px solid #1a5276;  /* Dark border */
+            }
+            QPushButton:hover {
+                background-color: #1a5276;  /* Even darker on hover */
+                border: 2px solid #154360;
+            }
+        """)
+        restart_button.clicked.connect(lambda: self.restart_test(self.completion_overlay))
+        
+        menu_button = QPushButton("🏠 Main Menu")
+        menu_button.setStyleSheet("""
+            QPushButton {
+                background-color: #c0392b;  /* Darker red */
+                color: white;
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: bold;
+                padding: 8px 15px;
+                border: 2px solid #922b21;  /* Dark border */
+            }
+            QPushButton:hover {
+                background-color: #922b21;  /* Even darker on hover */
+                border: 2px solid #7b241c;
+            }
+        """)
+        menu_button.clicked.connect(lambda: self.return_to_menu(self.completion_overlay))
+        
+        button_layout.addWidget(restart_button)
+        button_layout.addWidget(menu_button)
+        
+        container_layout.addLayout(button_layout)
+        
+        # Center the container within the overlay
+        overlay_layout = QVBoxLayout(self.completion_overlay)
+        overlay_layout.addWidget(completion_container, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        # Show the overlay in the parent widget's scope
+        self.completion_overlay.setParent(self)
+        self.completion_overlay.show()
+        self.completion_overlay.raise_()  # Ensure it's on top
+        completion_container.raise_()  # Ensure container is on top of overlay
+        
+        # Add animation effect
+        anim = QPropertyAnimation(completion_container, b"pos")
+        anim.setDuration(800)
+        anim.setStartValue(completion_container.pos() + QPoint(0, 30))
+        anim.setEndValue(completion_container.pos())
+        anim.setEasingCurve(QEasingCurve.OutBack)
+        anim.start()
+
+
 
     def handle_wrong_answer(self, selected_gesture):
         """Handle a wrong answer."""
@@ -1190,6 +1525,151 @@ class IntermediateMode(QWidget):
         overlay.deleteLater()
         self.parent().setCurrentIndex(0)
 
+    def proceed_to_next(self):
+        """Load next gesture after feedback"""
+        # Check if we've reached level 5 (test completion)
+        current_level = int(self.level_label.text().split(": ")[1])
+        if current_level >= 5:
+            return  # Don't proceed if test is complete
+            
+        for btn in self.choice_buttons:
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #3498db;
+                    color: white;
+                    border-radius: 15px;
+                    font-size: 20px;
+                    font-weight: bold;
+                    margin: 8px;
+                }
+                QPushButton:hover {
+                    background-color: #2980b9;
+                }
+            """)
+            
+        self.load_new_gesture()
+        self.media_player.play()
+            
+        if not self.practice_mode:
+            self.start_timer()
+
+
+
+    def restart_test(self, overlay_to_close=None):
+        """Restart the test and reset all variables."""
+        # Close any overlay if provided
+        if overlay_to_close:
+            overlay_to_close.deleteLater()
+        
+        # Reset all variables
+        self.score = 0
+        self.current_streak = 0
+        self.best_streak = 0
+        self.time_remaining = 45
+        
+        # Reset statistics
+        self.stats = {
+            'total_attempts': 0,
+            'correct_answers': 0,
+            'average_time': 0,
+            'best_time': float('inf')
+        }
+        
+        # Update the UI
+        self.score_label.setText(f"Score: {self.score}")
+        self.streak_label.setText(f"Streak: {self.current_streak} 🔥")
+        self.best_streak_label.setText(f"Best: {self.best_streak} ⭐")
+        self.timer_label.setText(f"Time: {self.time_remaining}s")
+        self.level_label.setText("Level: 1")
+        
+        # Reset bonus multiplier
+        self.reset_bonus()
+        
+        # Stop any ongoing timers
+        self.timer.stop()
+        
+        # Recreate the video widget if it was removed
+        self.recreate_video_widget()
+        
+        # Start a new session
+        self.start_session()
+
+
+
+
+
+
+
+
+
+    def return_to_menu(self, overlay_to_close=None):
+        """Return to the main menu."""
+        # Close any overlay if provided
+        if overlay_to_close:
+            overlay_to_close.deleteLater()
+            
+        # Reset the test
+        self.reset_test()
+        
+        # Go back to modes directly without showing exit confirmation
+        try:
+            main_window = self.window()
+            if hasattr(main_window, 'navbar'):
+                main_window.navbar.setEnabled(True)
+        except:
+            pass
+        
+        # Go directly to the main menu without showing exit confirmation
+        self.parent().setCurrentIndex(0)
+
+
+
+    def recreate_video_widget(self):
+        """Recreate the video widget and media player."""
+        # Get the main layout to find the right frame
+        main_layout = self.layout()
+        if main_layout and main_layout.count() > 1:
+            # Get the right frame (second item in the main horizontal layout)
+            right_frame = main_layout.itemAt(1).widget()
+            
+            # Find the layout containing the video widget or its replacement
+            right_layout = right_frame.layout()
+            if right_layout:
+                # Find and remove the blank widget that replaced the video widget
+                for i in range(right_layout.count()):
+                    item = right_layout.itemAt(i)
+                    if item and item.widget() and item.widget() != self.video_widget:
+                        # Check if this is the blank widget (not a button, etc.)
+                        if type(item.widget()) == QWidget and not isinstance(item.widget(), QPushButton):
+                            # Remove the blank widget
+                            blank_widget = item.widget()
+                            right_layout.removeWidget(blank_widget)
+                            blank_widget.deleteLater()
+                            
+                            # Recreate the video widget if needed
+                            if not hasattr(self, 'video_widget') or self.video_widget is None:
+                                self.video_widget = QVideoWidget()
+                                self.video_widget.setAspectRatioMode(Qt.AspectRatioMode.KeepAspectRatio)
+                                self.video_widget.setStyleSheet("background-color: black;")
+                            
+                            # Recreate the media player
+                            self.destroy_media_player()
+                            
+                            # Add the video widget back to the layout
+                            right_layout.insertWidget(i, self.video_widget)
+                            self.video_widget.show()
+                            break
+
+
+
+
+
+
+
+
+
+
+
     def reset_test(self):
         """Reset all test parameters and UI elements"""
         # Reset scores and timers
@@ -1198,22 +1678,26 @@ class IntermediateMode(QWidget):
         self.best_streak = 0
         self.time_remaining = 45
         self.timer.stop()
-        self.media_player.stop()
         
+        # Stop the media player and clear the source
+        self.media_player.stop()
+        self.media_player.setSource(QUrl())
+            
         # Reset UI elements
         self.score_label.setText("Score: 0")
         self.streak_label.setText("Streak: 0 🔥")
         self.best_streak_label.setText("Best: 0 ⭐")
         self.timer_label.setText("Time: 45s")
-        
+        self.level_label.setText("Level: 1")
+            
         # Reset video elements visibility
         self.video_widget.hide()
         self.play_button.hide()
-        
+            
         # Show start button
         self.start_button.show()
         self.start_button.setEnabled(True)
-        
+            
         # Reset choice buttons
         for btn in self.choice_buttons:
             btn.setEnabled(False)
@@ -1231,14 +1715,15 @@ class IntermediateMode(QWidget):
                     background-color: #2980b9;
                 }
             """)
-        
+            
         # Reset practice mode
         self.practice_mode = False
         self.practice_mode_btn.setChecked(False)
-        
+        self.hint_button.hide()
+            
         # Reset bonus multiplier
         self.reset_bonus()
-        
+            
         # Reset statistics
         self.stats = {
             'total_attempts': 0,
@@ -1246,12 +1731,25 @@ class IntermediateMode(QWidget):
             'average_time': 0,
             'best_time': float('inf')
         }
+            
+        # Try to re-enable navbar if it exists
+        try:
+            main_window = self.window()
+            if hasattr(main_window, 'navbar'):
+                main_window.navbar.setEnabled(True)
+        except:
+            pass
+
 
 
     def go_back_to_modes(self):
+        # Stop the media player and clear the source
         self.media_player.stop()
+        self.media_player.setSource(QUrl())
+        
         self.timer.stop()
         self.show_exit_confirmation()
+
 
     def __del__(self):
         """Clean up resources"""
