@@ -1116,7 +1116,7 @@ class IntermediateMode(QWidget):
             self.level_label.setText(f"Level: {new_level}")
             
         # Check if user has reached level 2
-        if new_level == 1:
+        if new_level == 5:
             # Immediately stop the media player
             self.media_player.stop()
             self.media_player.setSource(QUrl())

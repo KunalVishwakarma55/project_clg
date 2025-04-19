@@ -473,13 +473,13 @@ class BeginnerMode(QWidget):
     def show_completion_screen(self):
         """Display completion screen when all 26 letters are completed."""
         self.timer.stop()
-        
+                
         # Create a semi-transparent overlay for the entire application
         self.completion_overlay = QFrame(self)
         self.completion_overlay.setStyleSheet("background-color: rgba(0, 0, 0, 0.8);")  # Darker overlay
         self.completion_overlay.setGeometry(self.rect())
         self.completion_overlay.raise_()  # Make sure overlay is on top
-        
+                
         # Create a container for the completion message
         completion_container = QFrame(self.completion_overlay)
         completion_container.setStyleSheet("""
@@ -491,18 +491,18 @@ class BeginnerMode(QWidget):
         """)
         # Set fixed width to prevent text cutoff
         completion_container.setFixedWidth(500)
-        
+                
         # Create layout for the completion container with appropriate margins
         container_layout = QVBoxLayout(completion_container)
         container_layout.setContentsMargins(20, 20, 20, 20)
         container_layout.setSpacing(10)
-        
+                
         # Trophy icon
         trophy_label = QLabel("🏆")
         trophy_label.setStyleSheet("font-size: 32px; margin-bottom: 5px;")
         trophy_label.setAlignment(Qt.AlignCenter)
         container_layout.addWidget(trophy_label)
-        
+                
         # Add congratulations message with improved color
         congrats_label = QLabel("🎉 Congratulations! 🎉")
         congrats_label.setStyleSheet("""
@@ -515,7 +515,7 @@ class BeginnerMode(QWidget):
         """)
         congrats_label.setAlignment(Qt.AlignCenter)
         container_layout.addWidget(congrats_label)
-        
+                
         # Add completion message with improved color
         completion_message = QLabel("You've mastered all 26 ASL letters!")
         completion_message.setStyleSheet("""
@@ -529,7 +529,7 @@ class BeginnerMode(QWidget):
         completion_message.setAlignment(Qt.AlignCenter)
         completion_message.setWordWrap(True)
         container_layout.addWidget(completion_message)
-        
+                
         # Add score container with improved colors
         score_container = QFrame()
         score_container.setStyleSheet("""
@@ -541,7 +541,7 @@ class BeginnerMode(QWidget):
         score_layout = QVBoxLayout(score_container)
         score_layout.setContentsMargins(10, 10, 10, 10)
         score_layout.setSpacing(5)
-        
+                
         # Score information with improved colors
         final_score = QLabel(f"Final Score: {self.score} 💎")
         final_score.setStyleSheet("""
@@ -551,7 +551,7 @@ class BeginnerMode(QWidget):
         """)
         final_score.setAlignment(Qt.AlignCenter)
         score_layout.addWidget(final_score)
-        
+                
         best_streak = QLabel(f"Best Streak: {self.best_streak} 🔥")
         best_streak.setStyleSheet("""
             font-size: 16px; 
@@ -560,9 +560,9 @@ class BeginnerMode(QWidget):
         """)
         best_streak.setAlignment(Qt.AlignCenter)
         score_layout.addWidget(best_streak)
-        
+                
         container_layout.addWidget(score_container)
-        
+                
         # Add statistics with improved colors and checks for valid values
         if self.stats['correct_answers'] > 0:
             stats_frame = QFrame()
@@ -575,54 +575,54 @@ class BeginnerMode(QWidget):
             stats_layout = QVBoxLayout(stats_frame)
             stats_layout.setContentsMargins(10, 10, 10, 10)
             stats_layout.setSpacing(5)
-            
+                        
             # Calculate accuracy and check for valid values
             accuracy = 0
             if self.stats['total_attempts'] > 0:
                 accuracy = (self.stats['correct_answers'] / self.stats['total_attempts']) * 100
-            
+                        
             # Create simple label for each stat
             correct_label = QLabel(f"✅ Correct Answers: {self.stats['correct_answers']}")
             correct_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #196f3d;")
             correct_label.setAlignment(Qt.AlignCenter)
             stats_layout.addWidget(correct_label)
-            
+                        
             accuracy_label = QLabel(f"🎯 Accuracy: {accuracy:.1f}%")
             accuracy_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #7d3c98;")
             accuracy_label.setAlignment(Qt.AlignCenter)
             stats_layout.addWidget(accuracy_label)
-            
+                        
             # Check for valid average time
             avg_time_text = "N/A"
             if isinstance(self.stats['average_time'], (int, float)) and self.stats['average_time'] != float('inf'):
                 avg_time_text = f"{self.stats['average_time']:.1f}s"
-            
+                        
             avg_time_label = QLabel(f"⏱️ Avg Time: {avg_time_text}")
             avg_time_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1a5276;")
             avg_time_label.setAlignment(Qt.AlignCenter)
             stats_layout.addWidget(avg_time_label)
-            
+                        
             # Check for valid best time
             best_time_text = "N/A"
             if isinstance(self.stats['best_time'], (int, float)) and self.stats['best_time'] != float('inf'):
                 best_time_text = f"{self.stats['best_time']:.1f}s"
-            
+                        
             best_time_label = QLabel(f"🚀 Best Time: {best_time_text}")
             best_time_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #a93226;")
             best_time_label.setAlignment(Qt.AlignCenter)
             stats_layout.addWidget(best_time_label)
-            
+                        
             container_layout.addWidget(stats_frame)
         else:
             stats_label = QLabel("No correct answers recorded.")
             stats_label.setStyleSheet("font-size: 16px; color: #c0392b; font-weight: bold;")
             stats_label.setAlignment(Qt.AlignCenter)
             container_layout.addWidget(stats_label)
-        
+                
         # Add buttons with enhanced styling
         button_layout = QHBoxLayout()
         button_layout.setSpacing(15)
-        
+                
         restart_button = QPushButton("🔄 Restart")
         restart_button.setStyleSheet("""
             QPushButton {
@@ -639,8 +639,9 @@ class BeginnerMode(QWidget):
                 border: 2px solid #154360;
             }
         """)
-        restart_button.clicked.connect(lambda: self.restart_test())
-        
+        # Fix: Use direct method connection instead of lambda
+        restart_button.clicked.connect(self.restart_test)
+                
         menu_button = QPushButton("🏠 Main Menu")
         menu_button.setStyleSheet("""
             QPushButton {
@@ -657,23 +658,24 @@ class BeginnerMode(QWidget):
                 border: 2px solid #7b241c;
             }
         """)
-        menu_button.clicked.connect(lambda: self.return_to_menu())
-        
+        # Fix: Use direct method connection instead of lambda
+        menu_button.clicked.connect(self.return_to_menu)
+                
         button_layout.addWidget(restart_button)
         button_layout.addWidget(menu_button)
-        
+                
         container_layout.addLayout(button_layout)
-        
+                
         # Center the container within the overlay
         overlay_layout = QVBoxLayout(self.completion_overlay)
         overlay_layout.addWidget(completion_container, alignment=Qt.AlignCenter)
-        
+                
         # Show the overlay in the parent widget's scope
         self.completion_overlay.setParent(self)
         self.completion_overlay.show()
         self.completion_overlay.raise_()  # Ensure it's on top
         completion_container.raise_()  # Ensure container is on top of overlay
-        
+                
         # Add animation effect
         anim = QPropertyAnimation(completion_container, b"pos")
         anim.setDuration(800)
@@ -681,6 +683,7 @@ class BeginnerMode(QWidget):
         anim.setEndValue(completion_container.pos())
         anim.setEasingCurve(QEasingCurve.OutBack)
         anim.start()
+
 
 
     def show_statistics_from_completion(self, overlay):
@@ -1026,36 +1029,50 @@ class BeginnerMode(QWidget):
 
     def restart_test(self):
         """Restart the test and close the completion overlay."""
-        if hasattr(self, 'completion_overlay'):
-            self.completion_overlay.deleteLater()
-        
+        # Simply check if the attribute exists and handle exceptions
+        try:
+            if hasattr(self, 'completion_overlay'):
+                self.completion_overlay.hide()  # Hide first to prevent visual glitches
+                self.completion_overlay.deleteLater()
+                del self.completion_overlay  # Remove the reference
+        except Exception as e:
+            print(f"Error cleaning up completion overlay: {e}")
+                
         # Enable navbar if it exists
         try:
             main_window = self.window()
             if hasattr(main_window, 'navbar'):
                 main_window.navbar.setEnabled(True)
-        except:
-            pass
-        
+        except Exception as e:
+            print(f"Error enabling navbar: {e}")
+                
         # Reset the test
         self.reset_test()
 
     def return_to_menu(self):
         """Return to the main menu and close the completion overlay."""
-        if hasattr(self, 'completion_overlay'):
-            self.completion_overlay.deleteLater()
-        
+        # Simply check if the attribute exists and handle exceptions
+        try:
+            if hasattr(self, 'completion_overlay'):
+                self.completion_overlay.hide()  # Hide first to prevent visual glitches
+                self.completion_overlay.deleteLater()
+                del self.completion_overlay  # Remove the reference
+        except Exception as e:
+            print(f"Error cleaning up completion overlay: {e}")
+                
         # Enable navbar if it exists
         try:
             main_window = self.window()
             if hasattr(main_window, 'navbar'):
                 main_window.navbar.setEnabled(True)
-        except:
-            pass
-        
+        except Exception as e:
+            print(f"Error enabling navbar: {e}")
+                
         # Reset the test and go back to the main menu
         self.reset_test()
         self.parent().setCurrentIndex(0)
+
+
 
 
 

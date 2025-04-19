@@ -1,6 +1,6 @@
 import sys
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QStackedWidget, QLabel, QProgressBar, QFrame, QHBoxLayout, QApplication, QPushButton
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, Signal, Slot
 from PySide6.QtGui import QFont, QPixmap, QIcon
 from ui.Home import Home 
 from ui.STT import STT
@@ -18,6 +18,7 @@ class MainWindow(QWidget):
         self.setWindowTitle("Sign Interpreter")
         self.setMinimumSize(1000, 720)
         # self.setWindowIcon(QIcon("assets/window-icon.png"))
+        
         main_layout = QVBoxLayout(self)
         self.setStyleSheet("background-color: #f3f4f6;")
         
@@ -44,6 +45,9 @@ class MainWindow(QWidget):
         self.content_area.addWidget(self.lesson)
         self.content_area.addWidget(self.learning)
         
+        # Connect the currentChanged signal to update button styles
+        self.content_area.currentChanged.connect(self.update_button_styles)
+        
     def create_nav_bar(self):
         # Sidebar container
         sidebar = QFrame()
@@ -57,13 +61,13 @@ class MainWindow(QWidget):
         logo.setStyleSheet("margin:15px 10px")
         sidebar_layout.addWidget(logo)
         
-        # Navigation buttons
+        # Navigation buttons with default icons if specific ones aren't available
         nav_buttons = [
-            ("Home", "assets/"),
-            ("Sign to Text", "assets/"),
-            ("Text to Sign", "assets/"),
-            ("ASL Test", "assets/"),
-            ("Lessons", "assets/")
+            ("Home", "assets/home.png"),
+            ("Sign to Text", "assets/stt.png"),
+            ("Text to Sign", "assets/tts.png"),
+            ("ASL Test", "assets/test.png"),
+            ("Lessons", "assets/lessons.png")
         ]
         
         self.nav_button_dict = {}
@@ -95,37 +99,50 @@ class MainWindow(QWidget):
         
         # Create navigation buttons
         for index, (text, icon_path) in enumerate(nav_buttons):
-            button = QPushButton()
-            button.setText(text)
-            button.setIcon(QIcon(icon_path))
-            button.setIconSize(QPixmap(icon_path).scaled(20, 20, Qt.KeepAspectRatio).size())
-            button.setStyleSheet(self.inactive_style)
-            sidebar_layout.addWidget(button)
+            button = QPushButton(text)
+            
+            # Try to load the icon, use a fallback if not found
+            icon = QIcon(icon_path)
+            if icon.isNull():
+                # Use a default icon or just text if icon not found
+                button.setText(text)
+            else:
+                button.setIcon(icon)
+                button.setIconSize(QSize(20, 20))
+            
+            # Set initial style
+            if index == 0:  # Home is active by default
+                button.setStyleSheet(self.active_style)
+            else:
+                button.setStyleSheet(self.inactive_style)
+                
+            # Store button reference
             self.nav_button_dict[text] = button
             
-            # Connect button click to change tab and active status
-            button.clicked.connect(lambda _, idx=index: self.switch_tab(idx))
+            # Connect button directly with its index
+            button.clicked.connect(lambda checked=False, idx=index: self.switch_tab(idx))
+            
+            sidebar_layout.addWidget(button)
         
         sidebar_layout.addStretch()
         return sidebar
     
+    @Slot(int)
     def switch_tab(self, index):
-        current_widget = self.content_area.currentWidget()
-        
         # If we're in a test (navbar disabled), don't allow switching
         if not self.navbar.isEnabled():
             return
         
         # Switch the current tab
         self.content_area.setCurrentIndex(index)
-        
-        # Update styles for all buttons
-        self.update_button_styles()
     
+    @Slot()
     def update_button_styles(self):
+        current_index = self.content_area.currentIndex()
+        
         # Update styles for all buttons based on current index
-        for text, button in self.nav_button_dict.items():
-            if self.content_area.currentIndex() == list(self.nav_button_dict.keys()).index(text):
+        for i, (text, button) in enumerate(self.nav_button_dict.items()):
+            if i == current_index:
                 button.setStyleSheet(self.active_style)
             else:
                 button.setStyleSheet(self.inactive_style)
@@ -137,12 +154,15 @@ class MainWindow(QWidget):
         """
         # Disconnect all existing connections
         for text, button in self.nav_button_dict.items():
-            button.clicked.disconnect()
+            try:
+                button.clicked.disconnect()
+            except RuntimeError:
+                pass  # If not connected, ignore error
         
-        # Reconnect all buttons
+        # Reconnect all buttons properly
         for index, text in enumerate(self.nav_button_dict.keys()):
             self.nav_button_dict[text].clicked.connect(
-                lambda _, idx=index: self.switch_tab(idx)
+                lambda checked=False, idx=index: self.switch_tab(idx)
             )
         
         # Update button styles to reflect current state
@@ -150,10 +170,25 @@ class MainWindow(QWidget):
         
         # Make sure navbar is enabled
         self.navbar.setEnabled(True)
+    
+    # Add fullscreen toggle functionality
+    # def keyPressEvent(self, event):
+    #     # Toggle full screen with F11 key
+    #     if event.key() == Qt.Key_F11:
+    #         if self.isFullScreen():
+    #             self.showNormal()
+    #         else:
+    #             self.showFullScreen()
+    #     # Exit full screen with Escape key
+    #     elif event.key() == Qt.Key_Escape and self.isFullScreen():
+    #         self.showNormal()
+    #     else:
+    #         super().keyPressEvent(event)
 
 def main():
     app = QApplication(sys.argv)
     mainWin = MainWindow()
+    # Start in windowed mode
     mainWin.show()
     sys.exit(app.exec())
 
