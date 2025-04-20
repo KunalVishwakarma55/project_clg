@@ -21,6 +21,8 @@ class MainWindow(QWidget):
         
         main_layout = QVBoxLayout(self)
         self.setStyleSheet("background-color: #f3f4f6;")
+
+        
         
         # Sidebar
         self.navbar = self.create_nav_bar()

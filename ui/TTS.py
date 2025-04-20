@@ -15,10 +15,10 @@ from moviepy.editor import VideoFileClip, concatenate_videoclips, ColorClip
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QFrame, QButtonGroup, QTextEdit,
-    QGraphicsDropShadowEffect, QSlider
+    QGraphicsDropShadowEffect, QSlider, QDialog
 )
-from PySide6.QtCore import Qt, QUrl, QTimer
-from PySide6.QtGui import QFont, QPixmap, QColor, QMovie
+from PySide6.QtCore import Qt, QUrl, QTimer, Signal
+from PySide6.QtGui import QFont, QPixmap, QColor, QTextCursor, QKeySequence
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 
@@ -179,6 +179,49 @@ def text_to_sign(text: str, dataset: List[str], videos_path: str) -> Optional[st
         if 'final_clip' in locals():
             final_clip.close()
 
+class LimitedTextEdit(QTextEdit):
+    textLengthChanged = Signal(int)
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_length = 200  # Set your desired maximum length
+        self.textChanged.connect(self._on_text_changed)
+        
+    def _on_text_changed(self):
+        text = self.toPlainText()
+        if len(text) > self.max_length:
+            # Get the current cursor position
+            cursor = self.textCursor()
+            position = cursor.position()
+            
+            # Trim the text
+            self.blockSignals(True)
+            self.setPlainText(text[:self.max_length])
+            self.blockSignals(False)
+            
+            # Restore cursor position if possible
+            if position > self.max_length:
+                position = self.max_length
+            cursor.setPosition(position)
+            self.setTextCursor(cursor)
+            
+        self.textLengthChanged.emit(len(self.toPlainText()))
+        
+    def keyPressEvent(self, event):
+        # Allow paste operations but limit the length
+        if event.matches(QKeySequence.Paste):
+            clipboard = QApplication.clipboard()
+            text = clipboard.text()
+            if text:
+                current = self.toPlainText()
+                remaining = self.max_length - len(current)
+                if remaining <= 0:
+                    return
+                self.insertPlainText(text[:remaining])
+            return
+            
+        super().keyPressEvent(event)
+
 class TTS(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -205,51 +248,6 @@ class TTS(QMainWindow):
         """)
         self.media_player.mediaStatusChanged.connect(self.handle_media_status)
         
-        # Initialize loading spinner with a light color
-        self.loading_spinner = QLabel(self)
-        gif_path = os.path.abspath("assets/loa.svg")
-        self.loading_movie = QMovie(gif_path)
-        
-        # Debugging: Check if the GIF is loaded successfully
-        if not self.loading_movie.isValid():
-            print(f"Error: GIF file not found or invalid at path: {gif_path}")
-        else:
-            print("GIF loaded successfully")
-
-        self.loading_spinner.setMovie(self.loading_movie)
-        self.loading_movie.start()
-
-        if self.loading_movie.state() == QMovie.Running:
-            print("GIF is playing")
-        else:
-            print("GIF is not playing")
-
-        self.loading_spinner.setMovie(self.loading_movie)
-        self.loading_spinner.setFixedSize(200, 200)
-        self.loading_spinner.setStyleSheet("background-color: transparent;")
-        self.loading_spinner.hide()
-
-        self.is_loading = False
-
-    # Add a timer to delay hiding the loading animation
-        self.hide_animation_timer = QTimer()
-        self.hide_animation_timer.setSingleShot(True)  # Only trigger once
-        self.hide_animation_timer.timeout.connect(self.hide_loading_animation)
-        
-        # Animation text for loading
-        self.animation_label = QLabel(self)
-        self.animation_label.setAlignment(Qt.AlignCenter)
-        self.animation_label.setStyleSheet("color: white; font-size: 16px; background-color: rgba(0, 0, 0, 150); border-radius: 10px;")
-        self.animation_label.hide()
-
-        self.animation_text = ["Generating video", "Generating video ⚫", "Generating video ⚫⚫", "Generating video ⚫⚫⚫"]
-        self.animation_index = 0
-        self.animation_timer = QTimer()
-        self.animation_timer.timeout.connect(self.update_animation)
-
-        self.media_player.setAudioOutput(self.audio_output)
-        self.audio_output.setVolume(0.5)  # 0.5 = 50% volume
-
         # Initialize dataset
         self.dataset_path = "text-to-sign/Dataset/simplified_dataset"
         self.videos = os.listdir(self.dataset_path)
@@ -363,7 +361,8 @@ class TTS(QMainWindow):
             border: none;
         """)
 
-        self.text_input = QTextEdit()
+        # Create the limited text input
+        self.text_input = LimitedTextEdit()
         self.text_input.setStyleSheet("""
             QTextEdit {
                 border: 2px solid #eef2f7;
@@ -380,7 +379,21 @@ class TTS(QMainWindow):
             }
         """)
         self.text_input.setMinimumHeight(200)
-        self.text_input.setPlaceholderText("Enter your text here...")
+        self.text_input.setPlaceholderText("Enter your text here... (max 200 characters)")
+        
+        # Character counter
+        self.char_counter = QLabel("0/200 characters")
+        self.char_counter.setStyleSheet("""
+            QLabel {
+                color: #757575;
+                font-size: 12px;
+                font-family: 'Segoe UI';
+                text-align: right;
+                padding-right: 5px;
+            }
+        """)
+        self.char_counter.setAlignment(Qt.AlignRight)
+        self.text_input.textLengthChanged.connect(self.update_char_counter)
 
         # Right Frame Setup
         right_frame = QFrame()
@@ -414,7 +427,6 @@ class TTS(QMainWindow):
             padding-bottom: 5px;
             border-bottom: 2px solid #eef2f7;
             background-color: #ffffff;
-
         """)
 
         # Video Controls
@@ -592,7 +604,7 @@ class TTS(QMainWindow):
             ("▶ Send", "#2962ff", self.send_text),
             ("🗑️ Clear", "#ff1744", self.clear_text), 
             ("📋 Copy", "#00c853", self.copy_text),
-            ("📎 Paste", "#6200ea", self.paste_text)
+            ("🧩 Paste", "#6200ea", self.paste_text)
         ]
 
         for text, color, callback in buttons:
@@ -614,6 +626,7 @@ class TTS(QMainWindow):
         # Assembling Layouts
         left_layout.addWidget(input_label)
         left_layout.addWidget(self.text_input)
+        left_layout.addWidget(self.char_counter)
         left_layout.addLayout(buttons_layout)
 
         right_layout.addWidget(video_label)
@@ -625,6 +638,30 @@ class TTS(QMainWindow):
         main_layout.addWidget(right_frame, 1)
 
         self.main_layout.addWidget(main_widget)
+
+    def update_char_counter(self, length):
+        self.char_counter.setText(f"{length}/200 characters")
+        # Change color when approaching limit
+        if length > 180:
+            self.char_counter.setStyleSheet("""
+                QLabel {
+                    color: #d32f2f;
+                    font-size: 12px;
+                    font-family: 'Segoe UI';
+                    text-align: right;
+                    padding-right: 5px;
+                }
+            """)
+        else:
+            self.char_counter.setStyleSheet("""
+                QLabel {
+                    color: #757575;
+                    font-size: 12px;
+                    font-family: 'Segoe UI';
+                    text-align: right;
+                    padding-right: 5px;
+                }
+            """)
 
     def toggle_play_pause(self):
         if self.media_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
@@ -639,73 +676,44 @@ class TTS(QMainWindow):
         self.speed_label.setText(f"⚡ {speed:.2f}x")
         self.media_player.setPlaybackRate(speed)
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        if self.loading_spinner:
-            video_rect = self.video_widget.geometry()
-            spinner_x = video_rect.x() + (video_rect.width() - self.loading_spinner.width()) // 2
-            spinner_y = video_rect.y() + (video_rect.height() - self.loading_spinner.height()) // 2
-            self.loading_spinner.move(spinner_x, spinner_y)
-            self.animation_label.move(spinner_x, spinner_y + self.loading_spinner.height() + 10)
+    def handle_media_status(self, status, output_path):
+        """Handle media player state changes"""
+        if status == QMediaPlayer.MediaStatus.EndOfMedia:
+            # Clean up temporary video file when playback finishes
+            try:
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+            except:
+                pass
+        elif status == QMediaPlayer.MediaStatus.InvalidMedia:
+            self.show_error("Invalid video generated")
 
-    def show_loading_animation(self):
-        if not self.loading_movie.isValid():
-            print("Error: Loading GIF is not valid or not found.")
-            return
-
-        # Center the spinner on the video widget
-        video_rect = self.video_widget.geometry()
-        spinner_x = video_rect.x() + (video_rect.width() - self.loading_spinner.width()) // 2
-        spinner_y = video_rect.y() + (video_rect.height() - self.loading_spinner.height()) // 2
-        self.loading_spinner.move(spinner_x, spinner_y)
-        
-        # Ensure the spinner is visible and on top
-        self.loading_spinner.setStyleSheet("background-color: transparent;")
-        self.loading_spinner.raise_()  # Bring to the front
-        self.loading_spinner.show()
-        self.loading_movie.start()
-        
-        # Debugging: Check if the GIF is playing
-        if self.loading_movie.state() == QMovie.Running:
-            print("GIF is playing")
-        else:
-            print("GIF is not playing")
-        
-        # Start the animation text timer
-        self.animation_timer.start(500)
-        print("Loading animation shown")
-
-    def hide_loading_animation(self):
-        if self.loading_spinner.isVisible():  # Only hide if currently visible
-            self.loading_movie.stop()
-            self.loading_spinner.hide()
-            self.animation_timer.stop()
-            print("Loading animation hidden")
-
-    def update_animation(self):
-        self.animation_index = (self.animation_index + 1) % len(self.animation_text)
-        self.animation_label.setText(self.animation_text[self.animation_index])
-
-    def handle_media_status(self, status):
-        # Debugging: Print the media status
-        print(f"Media status: {status}")
-
-        if status == QMediaPlayer.MediaStatus.LoadingMedia:
-            if not self.is_loading:  # Only show if not already loading
-                self.is_loading = True
-                self.show_loading_animation()
-        elif status in [QMediaPlayer.MediaStatus.LoadedMedia, QMediaPlayer.MediaStatus.BufferedMedia]:
-            if self.is_loading:  # Only hide if currently loading
-                # Delay hiding the animation by 1 second
-                self.hide_animation_timer.start(1000)  # 1000 ms = 1 second
-                self.is_loading = False
+    def is_valid_input(self, text: str) -> bool:
+        """Check if the input text contains only allowed characters"""
+        # Allow letters, numbers, basic punctuation, and spaces
+        pattern = r'^[a-zA-Z0-9\s\.,!?]+$'
+        return bool(re.fullmatch(pattern, text))
 
     def send_text(self):
         if self.is_processing:
             return
             
+        text = self.text_input.toPlainText().strip()
+        
+        # Validate input
+        if not text:
+            self.show_error("Please enter some text")
+            return
+            
+        if not self.is_valid_input(text):
+            self.show_error("Only letters, numbers, and basic punctuation (. , ! ?) are allowed")
+            return
+            
+        if len(text) > 200:
+            self.show_error("Input exceeds maximum length of 200 characters")
+            return
+        
         self.is_processing = True
-        self.show_loading_animation()
         
         # Stop current playback
         self.media_player.stop()
@@ -714,22 +722,85 @@ class TTS(QMainWindow):
         # Process in background
         QTimer.singleShot(0, self._process_text)
 
+    def show_error(self, message: str):
+        """Show an error message to the user"""
+        error_label = QLabel(message)
+        error_label.setStyleSheet("""
+            QLabel {
+                color: #d32f2f;
+                font-size: 14px;
+                padding: 8px;
+                background-color: #ffebee;
+                border: 1px solid #ef9a9a;
+                border-radius: 4px;
+            }
+        """)
+        error_label.setAlignment(Qt.AlignCenter)
+        
+        # Show as a temporary popup
+        popup = QDialog(self)
+        popup.setWindowTitle("Input Error")
+        popup.setModal(True)
+        layout = QVBoxLayout()
+        layout.addWidget(error_label)
+        ok_button = QPushButton("OK")
+        ok_button.clicked.connect(popup.close)
+        layout.addWidget(ok_button)
+        popup.setLayout(layout)
+        popup.exec()
+
     def _process_text(self):
+        """Process text to sign language video (runs in background)"""
         try:
-            text = self.text_input.toPlainText()
-            if not text.strip():
+            # Get and validate input text
+            text = self.text_input.toPlainText().strip()
+            if not text:
+                self.show_error("Please enter some text first!")
                 return
-                
+
+            # Generate sign language video
             output_path = text_to_sign(text, self.video_names, self.dataset_path)
             
             if output_path and os.path.exists(output_path):
+                # Load the generated video
                 video_url = QUrl.fromLocalFile(os.path.abspath(output_path))
+                
+                # Disconnect previous connections to avoid duplicates
+                try:
+                    self.media_player.mediaStatusChanged.disconnect()
+                except:
+                    pass
+                
+                # Connect media status handler
+                self.media_player.mediaStatusChanged.connect(
+                    lambda status: self.handle_media_status(status, output_path)
+                )
+                
+                # Set and play video
                 self.media_player.setSource(video_url)
                 self.media_player.play()
                 self.play_pause_btn.setText("⏸ Pause")
+                self.play_pause_btn.setEnabled(True)
+                
+        except Exception as e:
+            print(f"Error in video processing: {str(e)}")
+            self.show_error("Failed to generate sign language video")
+            
         finally:
+            # Always reset processing flag and enable UI
             self.is_processing = False
-            self.hide_loading_animation()
+            self.text_input.setEnabled(True)
+            self.play_pause_btn.setEnabled(True)
+
+    def cleanup(self):
+        """Clean up resources when switching tabs"""
+        try:
+            self.media_player.stop()
+            self.media_player.setSource(QUrl())
+            self.is_processing = False
+            self.play_pause_btn.setText("▶ Play")
+        except:
+            pass
 
     def clear_text(self):
         self.text_input.clear()
@@ -738,7 +809,16 @@ class TTS(QMainWindow):
         self.text_input.copy()
 
     def paste_text(self):
-        self.text_input.paste()
+        # Handle paste with length limitation
+        clipboard = QApplication.clipboard()
+        text = clipboard.text()
+        if text:
+            current = self.text_input.toPlainText()
+            remaining = 200 - len(current)
+            if remaining <= 0:
+                self.show_error("Cannot paste - maximum length reached")
+                return
+            self.text_input.insertPlainText(text[:remaining])
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
